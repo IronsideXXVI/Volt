@@ -10,7 +10,7 @@ struct VoltApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra("Volt", image: VoltAssets.statusBarIconName.rawValue) {
+        MenuBarExtra("Volt", image: VoltAssets.statusBarIconName) {
             ContentView()
                 .environment(usageStore)
                 .environmentObject(updateController)

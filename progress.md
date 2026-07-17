@@ -13,13 +13,14 @@
 - July 17, 2026: Added Claude support using organization ID plus session key credentials. The app reads current-session, weekly, model-specific, and extra-usage data.
 - July 17, 2026: Added OpenAI/Codex support using OAuth credentials. Settings can import `~/.codex/auth.json`, tokens refresh when needed, and the app reads primary, secondary, model-specific, and credit limits.
 - July 17, 2026: Added Keychain-backed credential storage, provider connection/disconnection controls, and a dedicated Settings window.
-- July 17, 2026: Added Sparkle 2.8.1, automatic/manual update controls, and a shared Xcode scheme. Prepared an unsigned `dev` CI workflow and an automatic signed/notarized release plus appcast workflow for every push to `main` under `automation/workflows/`.
-- July 17, 2026: Local static validation passes for Swift syntax, plist/XML/JSON/YAML parsing, the Xcode project graph, and GitHub Actions syntax. A real Xcode compile still needs the macOS workflow or Dylan's Mac.
-- Next: install the workflow templates, complete an Xcode compile, test both providers with real accounts on Dylan's Mac, and review the UI in light/dark mode. Fixes continue on `dev`; production promotion to `main` remains Dylan's decision.
+- July 17, 2026: Added Sparkle 2.8.1, automatic/manual update controls, and a shared Xcode scheme. Prepared an unsigned `dev` CI workflow and an automatic signed/notarized release plus appcast workflow for every push to `main`.
+- July 17, 2026: Local static validation passes for Swift syntax, plist/XML/JSON/YAML parsing, the Xcode project graph, and GitHub Actions syntax.
+- July 17, 2026: Installed the validated workflow templates at `.github/workflows/build.yml` and `.github/workflows/release.yml`. Pushes to `dev` now trigger the macOS build, while the production release workflow remains limited to pushes to `main`.
+- Next: confirm the macOS Actions build succeeds, test both providers with real accounts on Dylan's Mac, and review the UI in light/dark mode. Fixes continue on `dev`; production promotion to `main` remains Dylan's decision.
 
 # Blockers / open questions
 
-- The connected GitHub integration can edit source code but received HTTP 403 when writing under `.github/workflows`. Dylan needs to copy `automation/workflows/build.yml` and `automation/workflows/release.yml` into `.github/workflows/` (or grant workflow-file permission) before CI and automatic releases are active.
+- The connected GitHub integration can verify workflow files but lacks Actions-read permission, so Dylan must confirm the latest `Build` result in the repository's Actions tab.
 - The Volt repository needs these Actions secrets before a production release can succeed: `DEVELOPER_ID_CERTIFICATE_P12`, `DEVELOPER_ID_CERTIFICATE_PASSWORD`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID`, `APPLE_API_KEY_CONTENT`, and `SPARKLE_PRIVATE_KEY`.
 - Volt currently uses the Sparkle public key already used by Hacker News. `SPARKLE_PRIVATE_KEY` must contain the matching private key, or both keys must be rotated together before release.
 - The repository is private. Sparkle clients cannot read private GitHub release assets or a private appcast without authentication. Before distributing Volt, make the release/feed publicly reachable (for example by making the repository public or using a separate public update host) and enable GitHub Pages for the `gh-pages` branch.

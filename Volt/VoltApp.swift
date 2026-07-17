@@ -6,7 +6,7 @@ struct VoltApp: App {
     @StateObject private var updateController = UpdateController()
 
     var body: some Scene {
-        MenuBarExtra("Volt", systemImage: "bolt.square.fill") {
+        MenuBarExtra("Volt", image: "VoltStatusBarIcon") {
             ContentView()
                 .environment(usageStore)
                 .environmentObject(updateController)

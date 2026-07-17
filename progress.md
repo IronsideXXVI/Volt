@@ -1,7 +1,7 @@
 # General notes
 
 - Development happens on `dev`; `main` is production and only receives Dylan-approved builds.
-- The Icon Composer source at `/images/appicon.icon` is Dylan's canonical app icon and must not be modified or replaced. `/images/applogo.png` is used as the in-app logo.
+- The Icon Composer source at `/images/appicon.icon` is Dylan's canonical app icon and must not be modified or replaced. `/images/applogo.png` is used as the in-app logo and as the source artwork for the branded 18-point menu-bar image.
 - Provider credentials are stored in the macOS login Keychain. Volt does not proxy credentials through another service.
 - Claude and OpenAI consumer usage endpoints are authenticated internal endpoints rather than stable public APIs, so their decoders and request paths may require maintenance when providers change them.
 
@@ -16,8 +16,9 @@
 - July 17, 2026: Added Sparkle 2.8.1, automatic/manual update controls, and a shared Xcode scheme. Prepared an unsigned `dev` CI workflow and an automatic signed/notarized release plus appcast workflow for every push to `main`.
 - July 17, 2026: Local static validation passes for Swift syntax, plist/XML/JSON/YAML parsing, the Xcode project graph, and GitHub Actions syntax.
 - July 17, 2026: Installed the validated workflow templates at `.github/workflows/build.yml` and `.github/workflows/release.yml`. Pushes to `dev` trigger the macOS build when Actions minutes are available, while the production release workflow remains limited to pushes to `main`.
-- July 17, 2026: Fixed an invisible menu bar item found during the first local run. The status item now uses SwiftUI's dedicated `MenuBarExtra` system-image initializer, and the redundant runtime activation-policy call was removed. Dylan's app logo remains in the menu panel and the Icon Composer app icon remains unchanged.
-- Next: pull the status-item fix and retest locally, then test both providers with real accounts and review the UI in light/dark mode. Fixes continue on `dev`; production promotion to `main` remains Dylan's decision.
+- July 17, 2026: Fixed an invisible menu bar item found during the first local run by temporarily switching to SwiftUI's dedicated `MenuBarExtra` system-image initializer and removing the redundant runtime activation-policy call.
+- July 17, 2026: Replaced the temporary SF Symbol with a dedicated 18-point, full-color menu-bar image derived from Dylan's `/images/applogo.png`. Volt now follows the proven named-image `MenuBarExtra` pattern used by Claude Usage, and the SF Symbol logo fallback was removed. The canonical Icon Composer app icon remains untouched.
+- Next: pull and visually verify the branded menu-bar image, then test both providers with real accounts and review the UI in light/dark mode. Fixes continue on `dev`; production promotion to `main` remains Dylan's decision.
 
 # Blockers / open questions
 

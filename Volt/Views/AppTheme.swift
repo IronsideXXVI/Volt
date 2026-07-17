@@ -36,26 +36,23 @@ extension Color {
 
 enum VoltAssets {
     static let logo: NSImage = {
-        if let url = Bundle.main.url(forResource: "applogo", withExtension: "png"),
-           let image = NSImage(contentsOf: url) {
-            return image
+        guard let url = Bundle.main.url(forResource: "applogo", withExtension: "png"),
+              let image = NSImage(contentsOf: url) else {
+            assertionFailure("Missing bundled applogo.png")
+            return NSImage(size: NSSize(width: 1, height: 1))
         }
 
-        return NSImage(
-            systemSymbolName: "bolt.square.fill",
-            accessibilityDescription: "Volt"
-        ) ?? NSImage(size: NSSize(width: 18, height: 18))
+        return image
     }()
 }
 
 struct VoltLogoView: View {
     var size: CGFloat = 30
-    var template = false
 
     var body: some View {
         Image(nsImage: VoltAssets.logo)
             .resizable()
-            .renderingMode(template ? .template : .original)
+            .renderingMode(.original)
             .scaledToFit()
             .frame(width: size, height: size)
             .accessibilityLabel("Volt")

@@ -17,7 +17,7 @@
 - July 17, 2026: Local static validation passes for Swift syntax, plist/XML/JSON/YAML parsing, the Xcode project graph, and GitHub Actions syntax.
 - July 17, 2026: Installed the validated workflow templates at `.github/workflows/build.yml` and `.github/workflows/release.yml`. Pushes to `dev` trigger the macOS build when Actions minutes are available, while the production release workflow remains limited to pushes to `main`.
 - July 17, 2026: Fixed an invisible menu bar item found during the first local run by temporarily switching to SwiftUI's dedicated `MenuBarExtra` system-image initializer and removing the redundant runtime activation-policy call.
-- July 17, 2026: Replaced the temporary SF Symbol with a dedicated 18-point, full-color menu-bar image derived from Dylan's `/images/applogo.png`. Volt now follows the proven named-image `MenuBarExtra` pattern used by Claude Usage, and the SF Symbol logo fallback was removed. The canonical Icon Composer app icon remains untouched.
+- July 17, 2026: Replaced the temporary SF Symbol with a dedicated 18-point, full-color copy of Dylan's bundled `/images/applogo.png`. Volt registers that resized copy as a named AppKit image at launch and follows the proven named-image `MenuBarExtra` pattern used by Claude Usage. The SF Symbol logo fallback was removed, and the canonical Icon Composer app icon remains untouched.
 - Next: pull and visually verify the branded menu-bar image, then test both providers with real accounts and review the UI in light/dark mode. Fixes continue on `dev`; production promotion to `main` remains Dylan's decision.
 
 # Blockers / open questions

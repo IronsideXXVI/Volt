@@ -25,9 +25,10 @@ struct ContentView: View {
 
             ScrollView {
                 providerContent
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
                     .padding(14)
             }
-            .frame(maxHeight: 500)
+            .frame(height: 360)
 
             Divider()
             footer

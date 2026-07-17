@@ -1,10 +1,26 @@
-#General notes
-- genral notes go here, add any notes to this section for any notes that you want to keep
+# General notes
 
-#Progress notes
-- Progrss notes go here,  add any notes to this section regarding progress that's been made so far, keep this section up to date and clean with the latest progress and what you have next. If more progress has been made or somethings fully complete, update this section by removing old stuff, or updating it with the latest.
+- Development happens on `dev`; `main` is production and only receives Dylan-approved builds.
+- The Icon Composer source at `/images/appicon.icon` is Dylan's canonical app icon and must not be modified or replaced. `/images/applogo.png` is used as the in-app and menu bar logo.
+- Provider credentials are stored in the macOS login Keychain. Volt does not proxy credentials through another service.
+- Claude and OpenAI consumer usage endpoints are authenticated internal endpoints rather than stable public APIs, so their decoders and request paths may require maintenance when providers change them.
 
-- Progress note: Dylan - 2:24 CST 07/17/2026 , I have created the xcode project and the repo that it lives in. I have also created the app icon and set that up. The app icon itself lives at /images/appicon.icon . Do not change or modify that file or try to override it or set up your own app icon. The one I created is already set up and uses a .icon file made with icon composer that has a lightmode, darkmode, and nutral mode, and the system already knows how to use it. I also created a PNG version of the appicon that lives at /images/applogo/png . This is what you'll want to use when you need the applogo for anything, for example we should use this as the logo that appears in the menu bar when the app is running.
+# Progress notes
 
-#Blockers/open questions
-- Any blockers that you've encountered go here, or open ended questions for Dylan. Keep this section up to date and clean. If something is no longer a blocker or a question has been answered, either remove it from here, or document the answer.
+- July 17, 2026: Synced the project/icon setup from `main` into `dev` before beginning implementation.
+- July 17, 2026: Replaced the starter SwiftData window app with a menu-bar-only SwiftUI app. There is no Dock icon or main window.
+- July 17, 2026: Added the initial provider dashboard with a Claude/OpenAI switcher, branded usage and elapsed-time bars, reset countdowns, account/plan details, credits/extra usage, loading/error/stale-data states, manual refresh, and a ten-minute refresh loop while the menu is active.
+- July 17, 2026: Added Claude support using organization ID plus session key credentials. The app reads current-session, weekly, model-specific, and extra-usage data.
+- July 17, 2026: Added OpenAI/Codex support using OAuth credentials. Settings can import `~/.codex/auth.json`, tokens refresh when needed, and the app reads primary, secondary, model-specific, and credit limits.
+- July 17, 2026: Added Keychain-backed credential storage, provider connection/disconnection controls, and a dedicated Settings window.
+- July 17, 2026: Added Sparkle 2.8.1, automatic/manual update controls, and a shared Xcode scheme. Prepared an unsigned `dev` CI workflow and an automatic signed/notarized release plus appcast workflow for every push to `main` under `automation/workflows/`.
+- July 17, 2026: Local static validation passes for Swift syntax, plist/XML/JSON/YAML parsing, the Xcode project graph, and GitHub Actions syntax. A real Xcode compile still needs the macOS workflow or Dylan's Mac.
+- Next: install the workflow templates, complete Xcode CI validation, test both providers with real accounts on Dylan's Mac, review the UI in light/dark mode, then merge the approved build into `dev`. Production promotion remains Dylan's decision.
+
+# Blockers / open questions
+
+- The connected GitHub integration can edit source code but received HTTP 403 when writing under `.github/workflows`. Dylan needs to copy `automation/workflows/build.yml` and `automation/workflows/release.yml` into `.github/workflows/` (or grant workflow-file permission) before CI and automatic releases are active.
+- The Volt repository needs these Actions secrets before a production release can succeed: `DEVELOPER_ID_CERTIFICATE_P12`, `DEVELOPER_ID_CERTIFICATE_PASSWORD`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID`, `APPLE_API_KEY_CONTENT`, and `SPARKLE_PRIVATE_KEY`.
+- Volt currently uses the Sparkle public key already used by Hacker News. `SPARKLE_PRIVATE_KEY` must contain the matching private key, or both keys must be rotated together before release.
+- The repository is private. Sparkle clients cannot read private GitHub release assets or a private appcast without authentication. Before distributing Volt, make the release/feed publicly reachable (for example by making the repository public or using a separate public update host) and enable GitHub Pages for the `gh-pages` branch.
+- Real-provider verification requires Dylan's Claude and OpenAI accounts; no credentials are committed to the repository or available in CI.

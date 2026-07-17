@@ -1,7 +1,7 @@
 # General notes
 
 - Development happens on `dev`; `main` is production and only receives Dylan-approved builds.
-- The Icon Composer source at `/images/appicon.icon` is Dylan's canonical app icon and must not be modified or replaced. `/images/applogo.png` is used as the in-app and menu bar logo.
+- The Icon Composer source at `/images/appicon.icon` is Dylan's canonical app icon and must not be modified or replaced. `/images/applogo.png` is used as the in-app logo.
 - Provider credentials are stored in the macOS login Keychain. Volt does not proxy credentials through another service.
 - Claude and OpenAI consumer usage endpoints are authenticated internal endpoints rather than stable public APIs, so their decoders and request paths may require maintenance when providers change them.
 
@@ -15,12 +15,13 @@
 - July 17, 2026: Added Keychain-backed credential storage, provider connection/disconnection controls, and a dedicated Settings window.
 - July 17, 2026: Added Sparkle 2.8.1, automatic/manual update controls, and a shared Xcode scheme. Prepared an unsigned `dev` CI workflow and an automatic signed/notarized release plus appcast workflow for every push to `main`.
 - July 17, 2026: Local static validation passes for Swift syntax, plist/XML/JSON/YAML parsing, the Xcode project graph, and GitHub Actions syntax.
-- July 17, 2026: Installed the validated workflow templates at `.github/workflows/build.yml` and `.github/workflows/release.yml`. Pushes to `dev` now trigger the macOS build, while the production release workflow remains limited to pushes to `main`.
-- Next: confirm the macOS Actions build succeeds, test both providers with real accounts on Dylan's Mac, and review the UI in light/dark mode. Fixes continue on `dev`; production promotion to `main` remains Dylan's decision.
+- July 17, 2026: Installed the validated workflow templates at `.github/workflows/build.yml` and `.github/workflows/release.yml`. Pushes to `dev` trigger the macOS build when Actions minutes are available, while the production release workflow remains limited to pushes to `main`.
+- July 17, 2026: Fixed an invisible menu bar item found during the first local run. The status item now uses SwiftUI's dedicated `MenuBarExtra` system-image initializer, and the redundant runtime activation-policy call was removed. Dylan's app logo remains in the menu panel and the Icon Composer app icon remains unchanged.
+- Next: pull the status-item fix and retest locally, then test both providers with real accounts and review the UI in light/dark mode. Fixes continue on `dev`; production promotion to `main` remains Dylan's decision.
 
 # Blockers / open questions
 
-- The connected GitHub integration can verify workflow files but lacks Actions-read permission, so Dylan must confirm the latest `Build` result in the repository's Actions tab.
+- GitHub Actions validation is paused because the account currently has no Actions minutes. Local Xcode builds are the active validation path.
 - The Volt repository needs these Actions secrets before a production release can succeed: `DEVELOPER_ID_CERTIFICATE_P12`, `DEVELOPER_ID_CERTIFICATE_PASSWORD`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID`, `APPLE_API_KEY_CONTENT`, and `SPARKLE_PRIVATE_KEY`.
 - Volt currently uses the Sparkle public key already used by Hacker News. `SPARKLE_PRIVATE_KEY` must contain the matching private key, or both keys must be rotated together before release.
 - The repository is private. Sparkle clients cannot read private GitHub release assets or a private appcast without authentication. Before distributing Volt, make the release/feed publicly reachable (for example by making the repository public or using a separate public update host) and enable GitHub Pages for the `gh-pages` branch.

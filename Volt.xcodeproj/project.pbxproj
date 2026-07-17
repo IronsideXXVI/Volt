@@ -3,21 +3,37 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 110;
+	objectVersion = 77;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		E0109B0B300AB6EF009566D6 /* appicon.icon in Resources */ = {isa = PBXBuildFile; fileRef = E0109B0A300AB6EF009566D6 /* appicon.icon */; };
+		E0109B11300AC001009566D6 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = E0109B10300AC001009566D6 /* Sparkle */; };
+		E0109B13300AC001009566D6 /* applogo.png in Resources */ = {isa = PBXBuildFile; fileRef = E0109B12300AC001009566D6 /* applogo.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		E0109AFA300A9E59009566D6 /* Volt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Volt.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E0109B0A300AB6EF009566D6 /* appicon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; name = appicon.icon; path = images/appicon.icon; sourceTree = "<group>"; };
+		E0109B12300AC001009566D6 /* applogo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = applogo.png; path = images/applogo.png; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		E0109B14300AC001009566D6 /* Exceptions for "Volt" folder in "Volt" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = E0109AF9300A9E59009566D6 /* Volt */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		E0109AFC300A9E59009566D6 /* Volt */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				E0109B14300AC001009566D6 /* Exceptions for "Volt" folder in "Volt" target */,
+			);
 			path = Volt;
 			sourceTree = "<group>";
 		};
@@ -26,8 +42,11 @@
 /* Begin PBXFrameworksBuildPhase section */
 		E0109AF7300A9E59009566D6 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
 			files = (
+				E0109B11300AC001009566D6 /* Sparkle in Frameworks */,
 			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
@@ -37,6 +56,7 @@
 			children = (
 				E0109AFC300A9E59009566D6 /* Volt */,
 				E0109B0A300AB6EF009566D6 /* appicon.icon */,
+				E0109B12300AC001009566D6 /* applogo.png */,
 				E0109AFB300A9E59009566D6 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -62,10 +82,15 @@
 			);
 			buildRules = (
 			);
+			dependencies = (
+			);
 			fileSystemSynchronizedGroups = (
 				E0109AFC300A9E59009566D6 /* Volt */,
 			);
 			name = Volt;
+			packageProductDependencies = (
+				E0109B10300AC001009566D6 /* Sparkle */,
+			);
 			productName = Volt;
 			productReference = E0109AFA300A9E59009566D6 /* Volt.app */;
 			productType = "com.apple.product-type.application";
@@ -85,7 +110,7 @@
 					};
 				};
 			};
-			buildConfigurationList = E0109AF5300A9E59009566D6 /* Build configuration list for PBXProject "Volt" */;
+			buildConfigurationList = E0109AF5300A9E5A009566D6 /* Build configuration list for PBXProject "Volt" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -94,6 +119,9 @@
 			);
 			mainGroup = E0109AF1300A9E59009566D6;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				E0109B0F300AC001009566D6 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E0109AFB300A9E59009566D6 /* Products */;
 			projectDirPath = "";
@@ -107,17 +135,22 @@
 /* Begin PBXResourcesBuildPhase section */
 		E0109AF8300A9E59009566D6 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
 			files = (
 				E0109B0B300AB6EF009566D6 /* appicon.icon in Resources */,
+				E0109B13300AC001009566D6 /* applogo.png in Resources */,
 			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		E0109AF6300A9E59009566D6 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
 			files = (
 			);
+			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
@@ -156,6 +189,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 69Y3X8R7D7;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -176,11 +210,12 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -220,6 +255,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 69Y3X8R7D7;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -234,10 +270,11 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;
@@ -245,23 +282,31 @@
 		E0109B08300A9E5A009566D6 /* Debug configuration for PBXNativeTarget "Volt" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = appicon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = Volt/Volt.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 69Y3X8R7D7;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_FILE = Volt/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Volt;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Dylan Ironside. All rights reserved.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.IronsideXXVI.Volt;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -277,23 +322,31 @@
 		E0109B09300A9E5A009566D6 /* Release configuration for PBXNativeTarget "Volt" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = appicon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = Volt/Volt.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 69Y3X8R7D7;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_FILE = Volt/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Volt;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Dylan Ironside. All rights reserved.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.IronsideXXVI.Volt;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -309,12 +362,13 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		E0109AF5300A9E59009566D6 /* Build configuration list for PBXProject "Volt" */ = {
+		E0109AF5300A9E5A009566D6 /* Build configuration list for PBXProject "Volt" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				E0109B05300A9E5A009566D6 /* Debug configuration for PBXProject "Volt" */,
 				E0109B06300A9E5A009566D6 /* Release configuration for PBXProject "Volt" */,
 			);
+			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 		E0109B07300A9E5A009566D6 /* Build configuration list for PBXNativeTarget "Volt" */ = {
@@ -323,10 +377,29 @@
 				E0109B08300A9E5A009566D6 /* Debug configuration for PBXNativeTarget "Volt" */,
 				E0109B09300A9E5A009566D6 /* Release configuration for PBXNativeTarget "Volt" */,
 			);
+			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		E0109B0F300AC001009566D6 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.8.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		E0109B10300AC001009566D6 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E0109B0F300AC001009566D6 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = E0109AF2300A9E59009566D6 /* Project object */;
-	validationLevel = 1;
 }

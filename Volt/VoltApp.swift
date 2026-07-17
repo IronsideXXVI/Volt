@@ -1,32 +1,30 @@
-//
-//  VoltApp.swift
-//  Volt
-//
-//  Created by Dylan Ironside on 7/17/26.
-//
-
+import AppKit
 import SwiftUI
-import SwiftData
 
 @main
 struct VoltApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+    @State private var usageStore = UsageStore()
+    @StateObject private var updateController = UpdateController()
 
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
+    init() {
+        NSApplication.shared.setActivationPolicy(.accessory)
+    }
 
     var body: some Scene {
-        WindowGroup {
+        MenuBarExtra {
             ContentView()
+                .environment(usageStore)
+                .environmentObject(updateController)
+        } label: {
+            VoltLogoView(size: 18, template: true)
         }
-        .modelContainer(sharedModelContainer)
+        .menuBarExtraStyle(.window)
+
+        Settings {
+            SettingsView()
+                .environment(usageStore)
+                .environmentObject(updateController)
+        }
+        .windowResizability(.contentSize)
     }
 }

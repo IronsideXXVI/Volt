@@ -11,6 +11,13 @@
 - At first I want to support two diffrent usage plans, Claude, and OpenAI.
 - The overal UI/UX and logic should be extremly simalar to my Claude usage app found in my git account called Claude usage, but with an additional option to switch between providers, and having auto updates.
 - Much of the auto update process and logic can be found in my repo called Hacker News. We can take logic from that for this project.
+- Because this is a menu bar application, it's main purpose is for it to be used via the menubar only, their should be no main app UI that appears when opening the app, and no app icon on the dock, it only runs in the munu bar just like Claud usage does.
+
+#Style
+The apps color schemes primary color is: #ff00ff
+The apps color schemes alt color is: #4c004a
+OpenAIs color schemes primary color is: Blue
+Anthropics color schemes primary color is: Orange
 
 #Use progress.md to keep notes, and keep track of progress. Anytime you're starting a new session, be sure to fully read progress md, then compare it to what's actually in the codebase right now to make sure it's accurate and up to date. If anything in progress md needs updating, then update it.
 #Whenever you have a question, or need somthing from me on my end, do not hesitate to ask.

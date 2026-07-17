@@ -15,7 +15,7 @@
 - July 17, 2026: Added Keychain-backed credential storage, provider connection/disconnection controls, and a dedicated Settings window.
 - July 17, 2026: Added Sparkle 2.8.1, automatic/manual update controls, and a shared Xcode scheme. Prepared an unsigned `dev` CI workflow and an automatic signed/notarized release plus appcast workflow for every push to `main` under `automation/workflows/`.
 - July 17, 2026: Local static validation passes for Swift syntax, plist/XML/JSON/YAML parsing, the Xcode project graph, and GitHub Actions syntax. A real Xcode compile still needs the macOS workflow or Dylan's Mac.
-- Next: install the workflow templates, complete Xcode CI validation, test both providers with real accounts on Dylan's Mac, review the UI in light/dark mode, then merge the approved build into `dev`. Production promotion remains Dylan's decision.
+- Next: install the workflow templates, complete an Xcode compile, test both providers with real accounts on Dylan's Mac, and review the UI in light/dark mode. Fixes continue on `dev`; production promotion to `main` remains Dylan's decision.
 
 # Blockers / open questions
 

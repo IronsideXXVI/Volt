@@ -6,8 +6,13 @@
 	objectVersion = 110;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		E0109B0B300AB6EF009566D6 /* appicon.icon in Resources */ = {isa = PBXBuildFile; fileRef = E0109B0A300AB6EF009566D6 /* appicon.icon */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		E0109AFA300A9E59009566D6 /* Volt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Volt.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E0109B0A300AB6EF009566D6 /* appicon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; name = appicon.icon; path = images/appicon.icon; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -31,6 +36,7 @@
 			isa = PBXGroup;
 			children = (
 				E0109AFC300A9E59009566D6 /* Volt */,
+				E0109B0A300AB6EF009566D6 /* appicon.icon */,
 				E0109AFB300A9E59009566D6 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -102,6 +108,7 @@
 		E0109AF8300A9E59009566D6 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
+				E0109B0B300AB6EF009566D6 /* appicon.icon in Resources */,
 			);
 		};
 /* End PBXResourcesBuildPhase section */

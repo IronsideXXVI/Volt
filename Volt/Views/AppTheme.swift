@@ -35,8 +35,6 @@ extension Color {
 }
 
 enum VoltAssets {
-    static let statusBarIconName = NSImage.Name("VoltMenuBarLogo")
-
     static let logo: NSImage = {
         guard let url = Bundle.main.url(forResource: "applogo", withExtension: "png"),
               let image = NSImage(contentsOf: url) else {
@@ -46,18 +44,6 @@ enum VoltAssets {
 
         return image
     }()
-
-    private static let statusBarIcon: NSImage = {
-        let image = logo.copy() as! NSImage
-        image.size = NSSize(width: 18, height: 18)
-        image.isTemplate = false
-        _ = image.setName(statusBarIconName)
-        return image
-    }()
-
-    static func registerStatusBarIcon() {
-        _ = statusBarIcon
-    }
 }
 
 struct VoltLogoView: View {

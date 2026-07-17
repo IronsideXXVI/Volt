@@ -19,6 +19,7 @@
 - July 17, 2026: Fixed an invisible menu bar item found during the first local run by temporarily switching to SwiftUI's dedicated `MenuBarExtra` system-image initializer and removing the redundant runtime activation-policy call.
 - July 17, 2026: Replaced the temporary SF Symbol with a dedicated 18-point, full-color copy of Dylan's bundled `/images/applogo.png`. Volt registers that resized copy as a named AppKit image at launch and follows the proven named-image `MenuBarExtra` pattern used by Claude Usage. The SF Symbol logo fallback was removed, and the canonical Icon Composer app icon remains untouched.
 - July 17, 2026: Fixed the resulting Xcode compile error by passing `NSImage.Name` directly to `MenuBarExtra`; on macOS it is a `String` type alias and has no `rawValue` member.
+- July 17, 2026: Replaced the ineffective runtime image-name registration with the same implementation pattern proven in Claude Usage: a real, original-color asset-catalog image with an 18-point canvas, referenced directly by `MenuBarExtra(_:image:)` before the scene is created.
 - Next: pull and visually verify the branded menu-bar image, then test both providers with real accounts and review the UI in light/dark mode. Fixes continue on `dev`; production promotion to `main` remains Dylan's decision.
 
 # Blockers / open questions

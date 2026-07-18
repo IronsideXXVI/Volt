@@ -26,6 +26,7 @@ private struct ClaudeAccountInfo: Sendable {
 private enum ClaudeOAuthRequestError: Error {
     case unauthorized
     case forbidden
+    case rateLimited(Date?)
     case status(Int)
     case invalidResponse
 }
@@ -79,8 +80,9 @@ enum ClaudeUsageNormalizer {
         weeklyWindows.append(contentsOf: scoped.weekly)
         featureWindows.append(contentsOf: scoped.other)
 
-        let scopedIdentities = Set(scoped.weekly.compactMap { window in
-            window.sourceIdentifier?.lowercased()
+        let scopedIdentities = Set<String>(scoped.weekly.compactMap { window -> String? in
+            guard window.isActive != false else { return nil }
+            return window.sourceIdentifier?.lowercased()
         })
         appendLegacyModelWindow(
             root: root,
@@ -271,27 +273,46 @@ enum ClaudeUsageNormalizer {
     }
 
     private static func scopedLimits(from value: Any?) -> (weekly: [UsageWindow], other: [UsageWindow]) {
-        guard let limits = value as? [[String: Any]] else { return ([], []) }
+        guard let limits = value as? [Any] else { return ([], []) }
         var weekly: [UsageWindow] = []
         var other: [UsageWindow] = []
         var seen = Set<String>()
 
-        for (index, entry) in limits.enumerated() {
-            guard let percent = flexibleDouble(entry["percent"]), percent.isFinite else { continue }
-            let kind = nonEmpty(entry["kind"] as? String)
-            let group = nonEmpty(entry["group"] as? String)
+        for (index, rawEntry) in limits.enumerated() {
+            guard let entry = rawEntry as? [String: Any],
+                  let percent = flexibleDouble(entry["percent"]),
+                  percent.isFinite
+            else {
+                continue
+            }
+            let kind = nonEmpty(entry["kind"] as? String)?.lowercased()
+            let group = nonEmpty(entry["group"] as? String)?.lowercased()
             let scope = entry["scope"] as? [String: Any]
             let model = scope?["model"] as? [String: Any]
             let modelID = nonEmpty(model?["id"] as? String)
             let modelName = nonEmpty(model?["display_name"] as? String)
-            let identity = modelID ?? modelName ?? kind ?? group ?? "limit-\(index)"
-            let id = "claude-limit-\(slug(identity))"
+            let modelTitle = modelName ?? modelID.map(readableName)
+            let isAllModels = isAllModelsScope(modelID: modelID, modelName: modelName)
+            let identityParts = [kind, group, modelID ?? modelName].compactMap { $0 }
+            let identity = identityParts.isEmpty ? "limit-\(index)" : identityParts.joined(separator: "-")
+            let generatedID = "claude-limit-\(slug(identity))"
+            let isWeeklyScoped = kind == "weekly_scoped" && group == "weekly"
+            let id = isWeeklyScoped && isAllModels ? "claude-weekly-all-models" : generatedID
             guard seen.insert(id).inserted else { continue }
 
-            if kind == "weekly_scoped", group == "weekly" {
-                guard let modelName else { continue }
-                guard !isAllModelsScope(modelID: modelID, modelName: modelName) else { continue }
-                let title = modelName.lowercased().hasSuffix(" only") ? modelName : "\(modelName) only"
+            let sourceIdentifier = [modelID, modelName, kind, group]
+                .compactMap { $0 }
+                .joined(separator: " ")
+            let isActive = flexibleBool(entry["is_active"])
+
+            if isWeeklyScoped {
+                let title: String
+                if isAllModels {
+                    title = "All models"
+                } else {
+                    let name = modelTitle ?? "Scoped weekly limit"
+                    title = name.lowercased().hasSuffix(" only") ? name : "\(name) only"
+                }
                 weekly.append(UsageWindow(
                     id: id,
                     title: title,
@@ -299,24 +320,46 @@ enum ClaudeUsageNormalizer {
                     displayMode: .used,
                     resetsAt: flexibleDate(entry["resets_at"]),
                     duration: 7 * 24 * 60 * 60,
-                    sourceIdentifier: [modelID, modelName].compactMap { $0 }.joined(separator: " "),
-                    isActive: flexibleBool(entry["is_active"])
+                    sourceIdentifier: sourceIdentifier,
+                    isActive: isActive
                 ))
             } else {
-                let title = modelName ?? readableName(kind ?? group ?? "Additional limit")
                 other.append(UsageWindow(
                     id: id,
-                    title: title,
+                    title: modelTitle ?? scopedLimitTitle(kind: kind, group: group),
                     usedPercent: percent,
                     displayMode: .used,
                     resetsAt: flexibleDate(entry["resets_at"]),
-                    duration: group == "weekly" ? 7 * 24 * 60 * 60 : nil,
-                    sourceIdentifier: identity,
-                    isActive: flexibleBool(entry["is_active"])
+                    duration: duration(forGroup: group),
+                    sourceIdentifier: sourceIdentifier.isEmpty ? identity : sourceIdentifier,
+                    isActive: isActive
                 ))
             }
         }
         return (weekly, other)
+    }
+
+    private static func scopedLimitTitle(kind: String?, group: String?) -> String {
+        switch slug(kind ?? "") {
+        case "routine", "routines", "claude-routines":
+            return "Daily Routines"
+        case "oauth-apps":
+            return "OAuth apps"
+        case "cowork":
+            return "Cowork"
+        default:
+            return readableName(kind ?? group ?? "Additional limit")
+        }
+    }
+
+    private static func duration(forGroup group: String?) -> TimeInterval? {
+        switch group {
+        case "hourly": return 60 * 60
+        case "daily": return 24 * 60 * 60
+        case "weekly": return 7 * 24 * 60 * 60
+        case "monthly": return 30 * 24 * 60 * 60
+        default: return nil
+        }
     }
 
     private static func appendLegacyModelWindow(
@@ -417,12 +460,17 @@ enum ClaudeUsageNormalizer {
                 value: formatMoney(spent, currency: currency)
             ))
         }
-        if extra != nil {
-            let limit = flexibleDouble(extra?["monthly_limit"])
+        if let limit = flexibleDouble(extra?["monthly_limit"]) {
             items.append(UsageDetailItem(
                 id: "claude-extra-monthly-limit",
                 title: "Monthly limit",
-                value: limit.map { formatMoney($0, currency: currency) } ?? "Unlimited"
+                value: formatMoney(limit, currency: currency)
+            ))
+        } else if flexibleBool(extra?["is_enabled"]) == true {
+            items.append(UsageDetailItem(
+                id: "claude-extra-monthly-limit",
+                title: "Monthly limit",
+                value: "Unlimited"
             ))
         }
         if let amount = auxiliary.prepaidAmount {
@@ -484,8 +532,8 @@ enum ClaudeUsageNormalizer {
         return nil
     }
 
-    private static func isAllModelsScope(modelID: String?, modelName: String) -> Bool {
-        let nameSlug = slug(modelName)
+    private static func isAllModelsScope(modelID: String?, modelName: String?) -> Bool {
+        let nameSlug = modelName.map(slug) ?? ""
         let idSlug = modelID.map(slug) ?? ""
         return nameSlug == "all-models" || idSlug == "all-models" || idSlug.hasSuffix("-all-models")
     }
@@ -703,16 +751,18 @@ enum ClaudeUsageService {
             throw ClaudeOAuthRequestError.unauthorized
         case 403:
             throw ClaudeOAuthRequestError.forbidden
+        case 429:
+            throw ClaudeOAuthRequestError.rateLimited(retryAfterDate(from: response))
         default:
             throw ClaudeOAuthRequestError.status(response.statusCode)
         }
     }
 
     private static func fetchWebUsage(_ credentials: ClaudeCredentials) async throws -> Data {
-        let organizationID = credentials.organizationID.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: "https://claude.ai/api/organizations/\(organizationID)/usage") else {
-            throw UsageServiceError.message("The Claude organization ID is not valid.")
+        guard let organizationID = normalizedOrganizationID(credentials.organizationID) else {
+            throw UsageServiceError.message("The Claude organization ID must be a valid UUID.")
         }
+        let url = organizationURL(organizationID, path: ["usage"])
         let request = authenticatedWebRequest(url: url, sessionKey: credentials.sessionKey)
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let response = response as? HTTPURLResponse else {
@@ -730,6 +780,8 @@ enum ClaudeUsageService {
                 throw UsageServiceError.claudeWebChallenge
             }
             throw UsageServiceError.invalidCredentials(.anthropic)
+        case 429:
+            throw UsageServiceError.rateLimited(.anthropic, retryAfterDate(from: response))
         default:
             throw UsageServiceError.server(.anthropic, response.statusCode)
         }
@@ -770,6 +822,9 @@ enum ClaudeUsageService {
             if [400, 401, 403].contains(response.statusCode) {
                 throw ClaudeOAuthRequestError.unauthorized
             }
+            if response.statusCode == 429 {
+                throw ClaudeOAuthRequestError.rateLimited(retryAfterDate(from: response))
+            }
             throw ClaudeOAuthRequestError.status(response.statusCode)
         }
 
@@ -787,6 +842,8 @@ enum ClaudeUsageService {
             return UsageServiceError.invalidCredentials(.anthropic)
         case ClaudeOAuthRequestError.forbidden:
             return UsageServiceError.claudeOAuthScope
+        case ClaudeOAuthRequestError.rateLimited(let retryAfter):
+            return UsageServiceError.rateLimited(.anthropic, retryAfter)
         case ClaudeOAuthRequestError.invalidResponse:
             return UsageServiceError.invalidResponse(.anthropic)
         case ClaudeOAuthRequestError.status(let status):
@@ -810,8 +867,8 @@ enum ClaudeUsageService {
     }
 
     private static func fetchOrganizationInfo(_ credentials: ClaudeCredentials) async -> ClaudeAccountInfo? {
-        let organizationID = credentials.organizationID.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: "https://claude.ai/api/organizations/\(organizationID)") else { return nil }
+        guard let organizationID = normalizedOrganizationID(credentials.organizationID) else { return nil }
+        let url = organizationURL(organizationID)
         guard let data = await optionalWebData(url: url, credentials: credentials),
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else {
@@ -834,11 +891,10 @@ enum ClaudeUsageService {
     }
 
     private static func fetchAuxiliaryUsage(_ credentials: ClaudeCredentials) async -> ClaudeAuxiliaryUsage {
-        let organizationID = credentials.organizationID.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !organizationID.isEmpty else { return .empty }
+        guard let organizationID = normalizedOrganizationID(credentials.organizationID) else { return .empty }
 
-        let creditsURL = URL(string: "https://claude.ai/api/organizations/\(organizationID)/prepaid/credits")!
-        let bundlesURL = URL(string: "https://claude.ai/api/organizations/\(organizationID)/prepaid/bundles")!
+        let creditsURL = organizationURL(organizationID, path: ["prepaid", "credits"])
+        let bundlesURL = organizationURL(organizationID, path: ["prepaid", "bundles"])
         let routineURL = URL(string: "https://claude.ai/v1/code/routines/run-budget")!
 
         async let creditsData = optionalWebData(url: creditsURL, credentials: credentials)
@@ -876,6 +932,36 @@ enum ClaudeUsageService {
             return nil
         }
         return data
+    }
+
+    private static func normalizedOrganizationID(_ value: String) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard UUID(uuidString: trimmed) != nil else { return nil }
+        return trimmed
+    }
+
+    private static func organizationURL(_ organizationID: String, path: [String] = []) -> URL {
+        var url = URL(string: "https://claude.ai/api/organizations")!
+        url.appendPathComponent(organizationID)
+        path.forEach { url.appendPathComponent($0) }
+        return url
+    }
+
+    private static func retryAfterDate(from response: HTTPURLResponse, now: Date = Date()) -> Date? {
+        guard let value = response.value(forHTTPHeaderField: "Retry-After")?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            !value.isEmpty
+        else {
+            return nil
+        }
+        if let seconds = TimeInterval(value), seconds >= 0 {
+            return now.addingTimeInterval(seconds)
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "EEE',' dd MMM yyyy HH':'mm':'ss zzz"
+        return formatter.date(from: value)
     }
 
     private static func flexibleDouble(_ value: Any?) -> Double? {

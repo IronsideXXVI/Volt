@@ -7,32 +7,32 @@ struct ContentView: View {
     var body: some View {
         @Bindable var store = store
 
-        VStack(spacing: 0) {
-            appHeader
-            providerSwitcher(selection: $store.selectedProvider)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 14)
+        ZStack {
+            VoltBackdrop(tint: store.selectedProvider.tint)
 
-            Rectangle()
-                .fill(VoltTheme.hairline)
-                .frame(height: 0.5)
-
-            ScrollView {
-                providerContent
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            VStack(spacing: 0) {
+                appHeader
+                providerSwitcher(selection: $store.selectedProvider)
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 16)
-            }
-            .frame(height: 462)
-            .scrollIndicators(.automatic)
+                    .padding(.bottom, 14)
 
-            Rectangle()
-                .fill(VoltTheme.hairline)
-                .frame(height: 0.5)
-            footer
+                Rectangle()
+                    .fill(VoltTheme.hairline)
+                    .frame(height: 0.5)
+
+                ScrollView {
+                    providerContent
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 16)
+                }
+                .frame(height: 474)
+                .scrollIndicators(.automatic)
+
+                footer
+            }
         }
-        .frame(width: 430)
-        .background(VoltTheme.canvas)
+        .frame(width: 440)
         .tint(VoltTheme.primary)
         .task(id: store.selectedProvider) {
             let provider = store.selectedProvider
@@ -51,54 +51,88 @@ struct ContentView: View {
     }
 
     private var appHeader: some View {
-        HStack(spacing: 11) {
-            VoltLogoView(size: 32)
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(VoltTheme.brandGradient)
+                    .shadow(color: VoltTheme.primary.opacity(0.22), radius: 9, y: 3)
+                VoltLogoView(size: 27)
+            }
+            .frame(width: 40, height: 40)
 
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Volt")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                Text("Usage intelligence")
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text("Volt")
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                    Text("AI USAGE")
+                        .font(.system(size: 8, weight: .heavy))
+                        .tracking(0.65)
+                        .foregroundStyle(VoltTheme.primary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(VoltTheme.primary.opacity(0.10), in: Capsule())
+                }
+                Text("Know your limits before they slow you down")
                     .font(.system(size: 10.5, weight: .medium))
                     .foregroundStyle(.secondary)
             }
 
-            Spacer()
+            Spacer(minLength: 8)
 
             connectionIndicator(for: store.selectedProvider)
         }
         .padding(.horizontal, 16)
-        .padding(.top, 14)
-        .padding(.bottom, 12)
+        .padding(.top, 15)
+        .padding(.bottom, 13)
     }
 
     private func providerSwitcher(selection: Binding<AIProvider>) -> some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 4) {
             ForEach(AIProvider.allCases) { provider in
                 let isSelected = selection.wrappedValue == provider
                 Button {
-                    selection.wrappedValue = provider
+                    withAnimation(.easeOut(duration: 0.18)) {
+                        selection.wrappedValue = provider
+                    }
                 } label: {
-                    HStack(spacing: 7) {
-                        Image(systemName: provider.systemImage)
-                            .font(.system(size: 11.5, weight: .semibold))
-                        Text(provider.displayName)
-                            .font(.system(size: 11.5, weight: isSelected ? .semibold : .medium))
+                    HStack(spacing: 8) {
+                        ZStack {
+                            Circle()
+                                .fill(isSelected ? provider.tint.opacity(0.16) : Color.primary.opacity(0.055))
+                            Image(systemName: provider.systemImage)
+                                .font(.system(size: 10.5, weight: .bold))
+                                .foregroundStyle(isSelected ? provider.tint : Color.secondary)
+                        }
+                        .frame(width: 24, height: 24)
+
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(provider.displayName)
+                                .font(.system(size: 11.5, weight: .semibold))
+                            Text(headerStatusLabel(for: provider))
+                                .font(.system(size: 8.5, weight: .medium))
+                                .foregroundStyle(.secondary)
+                        }
+
                         Spacer(minLength: 0)
+
                         Circle()
                             .fill(headerStatusColor(for: provider))
                             .frame(width: 6, height: 6)
                     }
                     .foregroundStyle(isSelected ? Color.primary : Color.secondary)
-                    .padding(.horizontal, 11)
-                    .frame(maxWidth: .infinity, minHeight: 34)
-                    .background(
-                        isSelected ? VoltTheme.elevatedSurface : Color.clear,
-                        in: RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    )
+                    .padding(.horizontal, 10)
+                    .frame(maxWidth: .infinity, minHeight: 42)
+                    .background {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(VoltTheme.surface)
+                                .shadow(color: Color.black.opacity(0.08), radius: 5, y: 2)
+                        }
+                    }
                     .overlay {
                         if isSelected {
-                            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                .strokeBorder(provider.tint.opacity(0.28), lineWidth: 0.75)
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .strokeBorder(provider.tint.opacity(0.25), lineWidth: 0.75)
                         }
                     }
                     .contentShape(Rectangle())
@@ -109,9 +143,9 @@ struct ContentView: View {
             }
         }
         .padding(4)
-        .background(VoltTheme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 13, style: .continuous)
                 .strokeBorder(VoltTheme.hairline, lineWidth: 0.5)
         }
     }
@@ -124,17 +158,16 @@ struct ContentView: View {
                     .controlSize(.mini)
                 Text("Syncing")
             }
-            .font(.system(size: 10.5, weight: .medium))
+            .font(.system(size: 9.5, weight: .semibold))
             .foregroundStyle(.secondary)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(VoltTheme.elevatedSurface, in: Capsule())
         } else {
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(headerStatusColor(for: provider))
-                    .frame(width: 7, height: 7)
-                Text(headerStatusLabel(for: provider))
-            }
-            .font(.system(size: 10.5, weight: .semibold))
-            .foregroundStyle(.secondary)
+            VoltStatusPill(
+                title: headerStatusLabel(for: provider),
+                color: headerStatusColor(for: provider)
+            )
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(headerStatusLabel(for: provider))
         }
@@ -208,92 +241,131 @@ struct ContentView: View {
     }
 
     private func snapshotHeader(_ snapshot: ProviderUsageSnapshot) -> some View {
-        HStack(alignment: .center, spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .fill(snapshot.provider.tint.opacity(0.12))
-                Image(systemName: snapshot.provider.systemImage)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(snapshot.provider.tint)
-            }
-            .frame(width: 40, height: 40)
+        ZStack(alignment: .topTrailing) {
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [snapshot.provider.tint.opacity(0.16), snapshot.provider.tint.opacity(0.045)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text("\(snapshot.provider.displayName) usage")
-                    .font(.system(size: 15, weight: .bold))
+            Circle()
+                .fill(snapshot.provider.tint.opacity(0.09))
+                .frame(width: 130, height: 130)
+                .blur(radius: 22)
+                .offset(x: 34, y: -58)
 
-                Text(snapshot.account?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
-                     ?? snapshot.provider.companyName)
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .textSelection(.enabled)
-            }
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .center, spacing: 12) {
+                    VoltIconTile(
+                        symbol: snapshot.provider.systemImage,
+                        tint: snapshot.provider.tint,
+                        size: 43,
+                        symbolSize: 16
+                    )
 
-            Spacer(minLength: 8)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(snapshot.provider.displayName)
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
 
-            if let plan = snapshot.plan?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty {
-                Text(plan)
-                    .font(.system(size: 10.5, weight: .bold))
-                    .foregroundStyle(snapshot.provider.tint)
-                    .lineLimit(1)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 5)
-                    .background(snapshot.provider.tint.opacity(0.11), in: Capsule())
-                    .overlay {
-                        Capsule().strokeBorder(snapshot.provider.tint.opacity(0.18), lineWidth: 0.5)
+                        Text(snapshot.account?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
+                             ?? snapshot.provider.companyName)
+                            .font(.system(size: 10.5, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .textSelection(.enabled)
                     }
-                    .frame(maxWidth: 145)
-                    .help(plan)
+
+                    Spacer(minLength: 8)
+
+                    if let plan = snapshot.plan?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty {
+                        VoltStatusPill(title: plan, color: snapshot.provider.tint, symbol: "bolt.fill")
+                            .frame(maxWidth: 150)
+                            .help(plan)
+                    }
+                }
+
+                HStack(spacing: 16) {
+                    summaryMetric(
+                        value: "\(snapshot.windows.count)",
+                        label: snapshot.windows.count == 1 ? "active limit" : "active limits"
+                    )
+                    Rectangle()
+                        .fill(snapshot.provider.tint.opacity(0.18))
+                        .frame(width: 0.5, height: 25)
+                    summaryMetric(
+                        value: "Live",
+                        label: "direct provider data"
+                    )
+                    Spacer()
+                }
             }
+            .padding(15)
         }
-        .padding(14)
-        .background(
-            LinearGradient(
-                colors: [snapshot.provider.tint.opacity(0.08), VoltTheme.surface],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-        )
+        .clipShape(RoundedRectangle(cornerRadius: 17, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(snapshot.provider.tint.opacity(0.18), lineWidth: 0.75)
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .strokeBorder(snapshot.provider.tint.opacity(0.22), lineWidth: 0.75)
+        }
+        .shadow(color: snapshot.provider.tint.opacity(0.08), radius: 12, y: 4)
+    }
+
+    private func summaryMetric(value: String, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(value)
+                .font(.system(size: 11.5, weight: .bold, design: .rounded))
+            Text(label)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(.secondary)
         }
     }
 
     private func usageLegend(tint: Color) -> some View {
-        HStack(spacing: 14) {
-            legendItem(color: tint, title: "Quota used")
-            legendItem(color: VoltTheme.windowElapsed, title: "Window elapsed")
-            Spacer(minLength: 0)
+        HStack(spacing: 13) {
+            VoltSectionLabel(title: "Usage pace", symbol: "chart.xyaxis.line")
+            Spacer(minLength: 4)
+            legendItem(color: tint, title: "Used")
+            legendItem(color: VoltTheme.windowElapsed, title: "Time")
         }
         .padding(.horizontal, 3)
+        .padding(.top, 2)
     }
 
     private func legendItem(color: Color, title: String) -> some View {
-        HStack(spacing: 5) {
-            Capsule()
+        HStack(spacing: 4) {
+            Circle()
                 .fill(color)
-                .frame(width: 13, height: 5)
+                .frame(width: 6, height: 6)
             Text(title)
         }
-        .font(.system(size: 9.5, weight: .medium))
+        .font(.system(size: 9, weight: .semibold))
         .foregroundStyle(.secondary)
     }
 
     private func usageSection(_ section: UsageSection, tint: Color) -> some View {
-        VoltSurface {
-            VStack(alignment: .leading, spacing: 13) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(section.title)
-                        .font(.system(size: 13, weight: .bold))
-                    if let subtitle = section.subtitle {
-                        Text(subtitle)
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
+        VoltSurface(accent: tint) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(section.title)
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                        if let subtitle = section.subtitle {
+                            Text(subtitle)
+                                .font(.system(size: 9.5, weight: .medium))
+                                .foregroundStyle(.secondary)
+                        }
                     }
+                    Spacer()
+                    Text("\(section.windows.count) WINDOW\(section.windows.count == 1 ? "" : "S")")
+                        .font(.system(size: 8, weight: .heavy))
+                        .tracking(0.45)
+                        .foregroundStyle(tint)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 4)
+                        .background(tint.opacity(0.09), in: Capsule())
                 }
 
                 ForEach(Array(section.windows.enumerated()), id: \.element.id) { index, window in
@@ -301,6 +373,7 @@ struct ContentView: View {
                         Rectangle()
                             .fill(VoltTheme.hairline)
                             .frame(height: 0.5)
+                            .padding(.vertical, 1)
                     }
                     UsageRowView(
                         window: window,
@@ -314,9 +387,8 @@ struct ContentView: View {
 
     private func detailSection(_ section: UsageDetailSection) -> some View {
         VoltSurface {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(section.title)
-                    .font(.system(size: 13, weight: .bold))
+            VStack(alignment: .leading, spacing: 13) {
+                VoltSectionLabel(title: section.title, symbol: "list.bullet.rectangle")
 
                 ForEach(Array(section.items.enumerated()), id: \.element.id) { index, item in
                     if index > 0 {
@@ -328,7 +400,7 @@ struct ContentView: View {
                     HStack(alignment: .firstTextBaseline, spacing: 14) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(item.title)
-                                .font(.system(size: 11.5, weight: .medium))
+                                .font(.system(size: 11.5, weight: .semibold))
                             if let detail = item.detail {
                                 Text(detail)
                                     .font(.system(size: 9.5))
@@ -340,6 +412,7 @@ struct ContentView: View {
 
                         Text(item.value)
                             .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                            .foregroundStyle(VoltTheme.primary)
                             .multilineTextAlignment(.trailing)
                             .lineLimit(3)
                             .textSelection(.enabled)
@@ -395,50 +468,67 @@ struct ContentView: View {
     }
 
     private var loadingView: some View {
-        VStack(spacing: 12) {
-            ProgressView()
-                .controlSize(.regular)
-            Text("Loading usage")
-                .font(.system(size: 12.5, weight: .semibold))
-            Text("Connecting directly to \(store.selectedProvider.companyName)…")
-                .font(.system(size: 10.5))
-                .foregroundStyle(.secondary)
+        VStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(store.selectedProvider.tint.opacity(0.11))
+                ProgressView()
+                    .controlSize(.regular)
+                    .tint(store.selectedProvider.tint)
+            }
+            .frame(width: 58, height: 58)
+
+            VStack(spacing: 4) {
+                Text("Syncing \(store.selectedProvider.displayName)")
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                Text("Pulling the latest limits directly from \(store.selectedProvider.companyName)")
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
         }
-        .frame(maxWidth: .infinity, minHeight: 320)
+        .frame(maxWidth: .infinity, minHeight: 350)
     }
 
     private func unconfiguredView(_ provider: AIProvider) -> some View {
-        VoltSurface {
-            VStack(spacing: 13) {
-                ZStack {
-                    Circle()
-                        .fill(provider.tint.opacity(0.11))
-                    Image(systemName: "key.fill")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(provider.tint)
-                }
-                .frame(width: 48, height: 48)
+        VoltSurface(cornerRadius: 18, padding: 0, accent: provider.tint) {
+            VStack(spacing: 0) {
+                VStack(spacing: 14) {
+                    VoltIconTile(symbol: "key.fill", tint: provider.tint, size: 58, symbolSize: 20)
 
-                Text("Connect \(provider.displayName)")
-                    .font(.system(size: 15, weight: .bold))
-                Text(configurationInstructions(for: provider))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
+                    VStack(spacing: 5) {
+                        Text("Connect \(provider.displayName)")
+                            .font(.system(size: 17, weight: .bold, design: .rounded))
+                        Text(configurationInstructions(for: provider))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
 
-                SettingsLink {
-                    Label("Open Settings", systemImage: "arrow.up.forward")
+                    SettingsLink {
+                        Label("Set up \(provider.displayName)", systemImage: "arrow.right")
+                            .frame(minWidth: 140)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(provider.tint)
+                    .controlSize(.large)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(provider.tint)
-                .controlSize(.large)
+                .padding(.horizontal, 28)
+                .padding(.vertical, 34)
+
+                HStack(spacing: 8) {
+                    Image(systemName: "lock.shield.fill")
+                        .foregroundStyle(.green)
+                    Text("Credentials stay encrypted in your Mac’s Keychain")
+                }
+                .font(.system(size: 9.5, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 11)
+                .background(Color.primary.opacity(0.025))
             }
-            .padding(.vertical, 24)
-            .padding(.horizontal, 18)
-            .frame(maxWidth: .infinity)
         }
-        .frame(minHeight: 340)
+        .frame(minHeight: 350)
     }
 
     private func errorView(_ message: String, provider: AIProvider) -> some View {
@@ -477,13 +567,17 @@ struct ContentView: View {
     private var footer: some View {
         TimelineView(.periodic(from: .now, by: 30)) { timeline in
             HStack(spacing: 7) {
-                if let updatedAt = store.snapshot(for: store.selectedProvider)?.updatedAt {
-                    Label(updatedDescription(updatedAt, now: timeline.date), systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text(store.selectedProvider.companyName)
-                        .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(headerStatusColor(for: store.selectedProvider))
+                        .frame(width: 6, height: 6)
+                    if let updatedAt = store.snapshot(for: store.selectedProvider)?.updatedAt {
+                        Text(updatedDescription(updatedAt, now: timeline.date))
+                    } else {
+                        Text(store.selectedProvider.companyName)
+                    }
                 }
+                .foregroundStyle(.secondary)
 
                 Spacer()
 
@@ -494,9 +588,9 @@ struct ContentView: View {
                 .keyboardShortcut("r", modifiers: .command)
 
                 SettingsLink {
-                    Image(systemName: "gearshape")
-                        .frame(width: 27, height: 27)
-                        .background(VoltTheme.surface, in: Circle())
+                    Image(systemName: "gearshape.fill")
+                        .frame(width: 29, height: 29)
+                        .background(VoltTheme.elevatedSurface, in: Circle())
                 }
                 .buttonStyle(.plain)
                 .help("Settings")
@@ -508,19 +602,26 @@ struct ContentView: View {
                 }
                 .keyboardShortcut("q", modifiers: .command)
             }
-            .font(.system(size: 10.5, weight: .medium))
+            .font(.system(size: 10, weight: .semibold))
             .padding(.horizontal, 15)
-            .padding(.vertical, 9)
+            .padding(.vertical, 10)
+            .background(.ultraThinMaterial)
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(VoltTheme.hairline)
+                    .frame(height: 0.5)
+            }
         }
     }
 
     private func footerButton(symbol: String, help: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .frame(width: 27, height: 27)
-                .background(VoltTheme.surface, in: Circle())
+                .frame(width: 29, height: 29)
+                .background(VoltTheme.elevatedSurface, in: Circle())
         }
         .buttonStyle(.plain)
+        .contentShape(Circle())
         .help(help)
         .accessibilityLabel(help)
     }

@@ -105,10 +105,30 @@ struct UsageWindow: Identifiable, Sendable {
         }
     }
 
-    /// The bar always visualizes quota consumed, regardless of whether the provider labels the
-    /// number as used or remaining. A limit with 10% remaining is therefore 90% full.
+    /// The usage bar always visualizes quota consumed, regardless of whether the provider labels
+    /// the number as used or remaining. A limit with 10% remaining is therefore 90% full.
     var barFraction: Double {
         clampedUsedPercent / 100
+    }
+
+    /// Progress through the quota period, derived from its known duration and next reset.
+    /// A weekly limit that resets in 10.5 hours is roughly 94% through its current window.
+    func windowElapsedFraction(at date: Date) -> Double? {
+        guard let resetsAt,
+              let duration,
+              duration.isFinite,
+              duration > 0
+        else {
+            return nil
+        }
+
+        let elapsed = duration - resetsAt.timeIntervalSince(date)
+        guard elapsed.isFinite else { return nil }
+        return min(max(elapsed / duration, 0), 1)
+    }
+
+    func windowElapsedPercentageDescription(at date: Date) -> String? {
+        windowElapsedFraction(at: date).map { Self.formattedPercent($0 * 100) }
     }
 
     var percentageDescription: String {

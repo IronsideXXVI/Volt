@@ -7,6 +7,8 @@ struct UsageRowView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    private let windowElapsedColor = Color(hex: "9898AA")
+
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { timeline in
             VStack(alignment: .leading, spacing: 8) {
@@ -23,11 +25,21 @@ struct UsageRowView: View {
                         .fixedSize()
                 }
 
-                MetricBar(
-                    value: window.barFraction,
-                    tint: metricColor,
-                    animatesChanges: !reduceMotion
-                )
+                VStack(spacing: 4) {
+                    MetricBar(
+                        value: window.barFraction,
+                        tint: metricColor,
+                        animatesChanges: !reduceMotion
+                    )
+
+                    if let elapsedFraction = window.windowElapsedFraction(at: timeline.date) {
+                        MetricBar(
+                            value: elapsedFraction,
+                            tint: windowElapsedColor,
+                            animatesChanges: !reduceMotion
+                        )
+                    }
+                }
 
                 metadata(now: timeline.date)
             }
@@ -40,26 +52,36 @@ struct UsageRowView: View {
 
     private func metadata(now: Date) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            HStack(alignment: .firstTextBaseline, spacing: 5) {
-                if let status = window.statusDescription {
+            if let status = window.statusDescription {
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
                     Image(systemName: statusSymbol)
                         .font(.system(size: 9.5, weight: .semibold))
                     Text(status)
                         .fontWeight(.medium)
-                } else if let reset = window.resetsAt {
+                }
+                .foregroundStyle(metadataColor)
+            }
+
+            if let reset = window.resetsAt {
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
                     Image(systemName: "clock")
                         .font(.system(size: 9.5, weight: .medium))
                     Text(resetDescription(reset, now: now))
-                } else if let detail = window.detail {
-                    Text(detail)
-                }
 
-                Spacer(minLength: 4)
+                    Spacer(minLength: 4)
 
-                if window.statusDescription != nil, let reset = window.resetsAt {
-                    Text(resetDescription(reset, now: now))
-                        .multilineTextAlignment(.trailing)
+                    if let elapsed = window.windowElapsedPercentageDescription(at: now) {
+                        Text(elapsed)
+                            .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                            .foregroundStyle(windowElapsedColor)
+                            .monospacedDigit()
+                            .fixedSize()
+                    }
                 }
+                .foregroundStyle(.secondary)
+            } else if window.statusDescription == nil, let detail = window.detail {
+                Text(detail)
+                    .foregroundStyle(metadataColor)
             }
 
             if let detail = window.detail,
@@ -67,11 +89,11 @@ struct UsageRowView: View {
                window.resetsAt != nil || window.statusDescription != nil {
                 Text(detail)
                     .fontWeight(.medium)
+                    .foregroundStyle(metadataColor)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
         .font(.system(size: 10.5))
-        .foregroundStyle(metadataColor)
     }
 
     private var metricColor: Color {
@@ -115,6 +137,9 @@ struct UsageRowView: View {
 
     private func accessibilityValue(now: Date) -> String {
         var parts = [window.accessibilityDescription]
+        if let elapsed = window.windowElapsedPercentageDescription(at: now) {
+            parts.append("\(elapsed) of quota window elapsed")
+        }
         if let status = window.statusDescription { parts.append(status) }
         if let reset = window.resetsAt { parts.append(resetDescription(reset, now: now)) }
         if let detail = window.detail { parts.append(detail) }

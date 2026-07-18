@@ -38,6 +38,10 @@
 - July 17, 2026: Reworked dashboard metadata and Settings state. Long account/plan values truncate safely, critical and inactive limits are visually distinct, saved snapshots are invalidated when credentials change, Save & Test reports a real refresh result, provider load failures are isolated, unsaved drafts are visible, and token rotations are reflected back into the form.
 - July 17, 2026: Added adaptive post-reset refresh timing and made both validation and production workflows run the warning-clean core test suite before building or releasing.
 
+## Usage-to-window comparison
+
+- July 18, 2026: Restored the Claude-Usage-style lower comparison bar with explicit semantics. The top bar remains quota consumed; the neutral lower bar is calculated from each limit's duration and next reset and shows the percentage of the quota window elapsed. Rows without reliable duration/reset data continue to show only usage, and accessibility output identifies both measurements.
+
 ## Production release automation
 
 - July 17, 2026: Rebuilt the production workflow around the active GitHub Actions path and Depot's `depot-macos-26` runner. Depot CI files under `.depot/workflows/` were intentionally not used because Depot CI does not provide macOS sandboxes.
@@ -54,12 +58,13 @@
 - July 17, 2026: Added thirteen normalization tests for consumed-vs-displayed math, quota states, title and identity preservation, split-window sorting, current spend schemas, dynamic deduplication, limits-only fallbacks, inactive scopes, epoch/ISO/relative resets, plan mapping, optional/malformed fields, auxiliary endpoints, and unknown future buckets.
 - July 17, 2026: `swift test -Xswiftc -warnings-as-errors` passes all thirteen tests with Swift 6.3.3 on Linux. Every Swift file also passes compiler parser validation, and every JSON fixture parses successfully.
 - July 17, 2026: No live credentials or identity-bearing endpoint payloads were added to source, tests, fixtures, logs, or documentation. The canonical app icon and in-app logo were not modified.
+- July 18, 2026: Added fixed-time coverage for elapsed-window progress, percentage formatting, boundary clamping, and missing timing data. All fourteen warning-clean core tests pass with Swift 6.3.3 on Linux; all Swift sources remain parser-valid.
 
 # Next verification
 
 - Pull `dev` on a Mac and run the Xcode 26 Debug build. The current sandbox has no macOS SDK, AppKit, SwiftUI, `xcodebuild`, `codesign`, `notarytool`, or `hdiutil`, so the app target and production signing pipeline cannot be executed locally here.
 - Exercise both saved accounts through Settings → Save & Test, then compare the resulting rows with the official provider pages.
-- Inspect the menu panel and Settings panes in light mode, dark mode, reduced transparency, and with long account/plan strings.
+- Inspect the menu panel and Settings panes in light mode, dark mode, reduced transparency, and with long account/plan strings. Confirm each timed quota's lower neutral bar and right-side percentage track elapsed window time, while untimed rows retain a single usage bar.
 - Connect Depot, confirm `depot-macos-26` access, configure all six Actions secrets, and complete the anonymous-download and Sparkle smoke tests in `docs/release-setup.md` before first production distribution.
 - Keep fixes on `dev`. Promotion to `main` remains Dylan's decision.
 

@@ -193,7 +193,7 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Label("Bar fill shows quota used", systemImage: "chart.bar.fill")
+                Label("Top: quota used · Bottom: window elapsed", systemImage: "chart.bar.fill")
                     .font(.system(size: 9.5))
                     .foregroundStyle(.tertiary)
             }

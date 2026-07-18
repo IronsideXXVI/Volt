@@ -6,43 +6,57 @@ struct UsageRowView: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { timeline in
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Text(window.title)
-                        .font(.system(size: 13, weight: .medium))
-                    Spacer()
-                    Text("\(Int(window.clampedUsedPercent.rounded()))%")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(tint)
+                        .font(.system(size: 12.5, weight: .medium))
+                        .lineLimit(2)
+                    Spacer(minLength: 8)
+                    Text(window.percentageDescription)
+                        .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                        .foregroundStyle(metricColor)
+                        .monospacedDigit()
+                        .fixedSize()
                 }
 
-                MetricBar(value: window.clampedUsedPercent / 100, tint: tint)
+                MetricBar(value: window.barFraction, tint: metricColor)
 
-                if let elapsed = window.elapsedPercent(at: timeline.date) {
-                    HStack(spacing: 8) {
-                        Text("Time")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(.tertiary)
-                            .frame(width: 28, alignment: .leading)
-                        MetricBar(value: elapsed / 100, tint: Color.secondary.opacity(0.65), height: 5)
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    if let reset = window.resetsAt {
+                        Image(systemName: "clock")
+                            .font(.system(size: 9.5, weight: .medium))
+                        Text(resetDescription(reset, now: timeline.date))
+                    } else if let detail = window.detail {
+                        Text(detail)
                     }
+                    Spacer(minLength: 0)
                 }
+                .font(.system(size: 10.5))
+                .foregroundStyle(window.isLimitReached == true ? Color.orange : Color.secondary)
 
-                if let reset = window.resetsAt {
-                    Label(resetDescription(reset, now: timeline.date), systemImage: "clock")
+                if let detail = window.detail, window.resetsAt != nil {
+                    Text(detail)
                         .font(.system(size: 10.5, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(window.isLimitReached == true ? Color.orange : Color.secondary)
                 }
             }
-            .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.primary.opacity(0.045))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.5)
-            )
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(window.title)
+            .accessibilityValue(window.percentageDescription)
+        }
+    }
+
+    private var metricColor: Color {
+        if window.isLimitReached == true || window.isAllowed == false {
+            return .orange
+        }
+        switch window.displayMode {
+        case .used where window.displayPercent >= 90:
+            return .orange
+        case .remaining where window.displayPercent <= 10:
+            return .orange
+        default:
+            return tint
         }
     }
 
@@ -50,36 +64,35 @@ struct UsageRowView: View {
         let interval = date.timeIntervalSince(now)
         guard interval > 0 else { return "Resetting now" }
 
-        let minutes = max(Int(interval / 60), 1)
-        let hours = minutes / 60
-        let remainingMinutes = minutes % 60
-        let days = hours / 24
+        let totalMinutes = max(Int(interval / 60), 1)
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
 
-        if days > 1 {
+        if hours >= 24 {
             return "Resets \(date.formatted(.dateTime.weekday(.abbreviated).hour().minute()))"
         }
         if hours > 0 {
-            return "Resets in \(hours) hr \(remainingMinutes) min"
+            return "Resets in \(hours) hr \(minutes) min"
         }
-        return "Resets in \(minutes) min"
+        return "Resets in \(totalMinutes) min"
     }
 }
 
 private struct MetricBar: View {
     let value: Double
     let tint: Color
-    var height: CGFloat = 8
 
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
-                Capsule().fill(VoltTheme.track)
                 Capsule()
-                    .fill(tint.gradient)
+                    .fill(VoltTheme.track)
+                Capsule()
+                    .fill(tint)
                     .frame(width: geometry.size.width * min(max(value, 0), 1))
             }
         }
-        .frame(height: height)
-        .accessibilityValue("\(Int(min(max(value, 0), 1) * 100)) percent")
+        .frame(height: 7)
+        .accessibilityHidden(true)
     }
 }

@@ -109,6 +109,48 @@ final class UsageNormalizerTests: XCTestCase {
         XCTAssertEqual(almostUsed.barFraction, 0.996, accuracy: 0.001)
     }
 
+    func testElapsedWindowBarComparesUsageAgainstQuotaPeriod() throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let duration: TimeInterval = 7 * 24 * 60 * 60
+        let remaining: TimeInterval = 10 * 60 * 60 + 51 * 60
+        let window = UsageWindow(
+            id: "elapsed-example",
+            title: "All models",
+            usedPercent: 81,
+            displayMode: .used,
+            resetsAt: now.addingTimeInterval(remaining),
+            duration: duration
+        )
+
+        XCTAssertEqual(
+            try XCTUnwrap(window.windowElapsedFraction(at: now)),
+            (duration - remaining) / duration,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(window.windowElapsedPercentageDescription(at: now), "94%")
+        XCTAssertEqual(
+            try XCTUnwrap(window.windowElapsedFraction(at: now.addingTimeInterval(-duration))),
+            0,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(window.windowElapsedFraction(at: now.addingTimeInterval(remaining + 1))),
+            1,
+            accuracy: 0.001
+        )
+
+        let unknownDuration = UsageWindow(
+            id: "unknown-duration",
+            title: "Additional limit",
+            usedPercent: 10,
+            displayMode: .used,
+            resetsAt: now.addingTimeInterval(60),
+            duration: nil
+        )
+        XCTAssertNil(unknownDuration.windowElapsedFraction(at: now))
+        XCTAssertNil(unknownDuration.windowElapsedPercentageDescription(at: now))
+    }
+
     func testOpenAISortsSplitFeatureWindowsAndReadsCurrentSpendShape() throws {
         let snapshot = try OpenAIUsageNormalizer.snapshot(
             from: fixture("openai-split-feature-current-spend"),

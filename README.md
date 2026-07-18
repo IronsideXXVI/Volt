@@ -80,9 +80,11 @@ The redacted fixtures cover OpenAI weekly-only, reversed primary/secondary, spli
 - `dev` is the integration and testing branch.
 - `main` is production only and should receive Dylan-approved builds from `dev`.
 
-Workflow templates live in `automation/workflows/`. Install them as `.github/workflows/build.yml` and `.github/workflows/release.yml` to enable:
+The active workflows live in `.github/workflows/`, with synchronized reviewable copies in `automation/workflows/`:
 
-- unsigned macOS validation for pull requests into `dev`;
-- a signed and notarized release, GitHub release notes, and a refreshed Sparkle appcast after every push to `main`.
+- `build.yml` runs plist validation, warning-clean core tests, and an unsigned macOS build for `dev` and relevant pull requests;
+- `release.yml` uses `depot-macos-26` to build, explicitly sign Sparkle and Volt, notarize and staple both the app and DMG, create generated GitHub release notes, and publish a historical Sparkle appcast plus versioned HTML notes after every approved push to `main`.
 
-The production workflow expects the same Apple signing/notarization secret names used by the Hacker News project, plus `SPARKLE_PRIVATE_KEY`. GitHub Pages (or another public host) must serve `appcast.xml`, and release downloads must be publicly reachable before external Sparkle updates can work.
+The production workflow expects the same five Apple signing/notarization secret names used by the Hacker News project, plus `SPARKLE_PRIVATE_KEY`. Volt's release asset, appcast, and release-note pages must all be anonymously reachable before external Sparkle updates can work. Because the repository is currently private, that distribution requirement is still blocked.
+
+See [Production release setup](docs/release-setup.md) for Depot connection requirements, all six secrets, Sparkle key verification, GitHub Pages setup, the private-repository blocker, promotion rules, and the first-release smoke test.

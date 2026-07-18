@@ -38,6 +38,16 @@
 - July 17, 2026: Reworked dashboard metadata and Settings state. Long account/plan values truncate safely, critical and inactive limits are visually distinct, saved snapshots are invalidated when credentials change, Save & Test reports a real refresh result, provider load failures are isolated, unsaved drafts are visible, and token rotations are reflected back into the form.
 - July 17, 2026: Added adaptive post-reset refresh timing and made both validation and production workflows run the warning-clean core test suite before building or releasing.
 
+## Production release automation
+
+- July 17, 2026: Rebuilt the production workflow around the active GitHub Actions path and Depot's `depot-macos-26` runner. Depot CI files under `.depot/workflows/` were intentionally not used because Depot CI does not provide macOS sandboxes.
+- July 17, 2026: Added manual dispatch with a strict `main`-branch guard, production concurrency, unique run-number versions, duplicate tag/release preflight, all-six-secret preflight, warning-clean core tests, and plist validation before release work.
+- July 17, 2026: Replaced broad Sparkle framework signing with Sparkle's documented inner-to-outer signing order for Installer, Downloader with preserved entitlements, Autoupdate, Updater, the framework, and finally Volt with distribution entitlements.
+- July 17, 2026: Added strict app and DMG signature checks, App Store Connect notarization diagnostics, retrying ticket stapling, Gatekeeper assessments without ignored failures, and a signed DMG containing `Volt.app` plus an `/Applications` symlink.
+- July 17, 2026: Changed Sparkle distribution from ZIP to the final notarized/stapled DMG. Sparkle's private key is written to a mode-600 temporary file, and both the EdDSA signature and reported artifact length are validated before publishing.
+- July 17, 2026: Added generated Markdown release notes, GitHub-rendered HTML notes for Sparkle's update UI, a history-preserving appcast helper that deduplicates builds and retains 15 releases, XML validation, and preservation of existing `gh-pages` files.
+- July 17, 2026: Synchronized active and template release workflows, restored warning-clean core tests in the active build workflow, documented Depot/secrets/Pages/public-hosting setup, and added a first-production-release smoke-test checklist.
+
 ## Tests and validation
 
 - July 17, 2026: Added a standalone SwiftPM core target plus eleven redacted fixtures covering OpenAI weekly-only, main + Spark, primary + secondary, split feature windows, code review, credits and current/legacy spend control; Claude legacy fields, limits-only and dynamic scoped limits, extra usage, prepaid credits/bundles, and routine budget.
@@ -47,14 +57,16 @@
 
 # Next verification
 
-- Pull `dev` on a Mac and run the Xcode 26 Debug build. The current sandbox has no macOS SDK, AppKit, SwiftUI, or `xcodebuild`, so the full app target cannot be compiled here.
+- Pull `dev` on a Mac and run the Xcode 26 Debug build. The current sandbox has no macOS SDK, AppKit, SwiftUI, `xcodebuild`, `codesign`, `notarytool`, or `hdiutil`, so the app target and production signing pipeline cannot be executed locally here.
 - Exercise both saved accounts through Settings → Save & Test, then compare the resulting rows with the official provider pages.
 - Inspect the menu panel and Settings panes in light mode, dark mode, reduced transparency, and with long account/plan strings.
+- Connect Depot, confirm `depot-macos-26` access, configure all six Actions secrets, and complete the anonymous-download and Sparkle smoke tests in `docs/release-setup.md` before first production distribution.
 - Keep fixes on `dev`. Promotion to `main` remains Dylan's decision.
 
 # Blockers / release notes
 
-- GitHub Actions validation is paused because the account currently has no Actions minutes. Local Xcode builds are the active app-target validation path.
+- Standard GitHub-hosted Actions validation is paused because the account currently has no Actions minutes. The production job now targets Depot, but Depot still must be connected and authorized for this repository; Depot's documented organization requirement may require moving Volt from Dylan's personal account to a GitHub organization.
 - The Volt repository needs these Actions secrets before a production release can succeed: `DEVELOPER_ID_CERTIFICATE_P12`, `DEVELOPER_ID_CERTIFICATE_PASSWORD`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID`, `APPLE_API_KEY_CONTENT`, and `SPARKLE_PRIVATE_KEY`.
 - Volt currently uses the Sparkle public key already used by Hacker News. `SPARKLE_PRIVATE_KEY` must contain the matching private key, or both keys must be rotated together before release.
-- The repository is private. Sparkle clients cannot read private GitHub release assets or a private appcast without authentication. Before distribution, make the release/feed publicly reachable and enable GitHub Pages for the `gh-pages` branch (or use another public update host).
+- The repository is private. Sparkle clients cannot anonymously read private GitHub release assets. Before distribution, either make Volt public or change the workflow to publish the DMG, appcast, and release notes through a separate public repository/bucket/CDN, then enable and verify GitHub Pages or the replacement host.
+- The GitHub App used by this environment does not currently have permission to create or update `.github/workflows/*`. The release branch may need to be pushed with Dylan's GitHub credentials or after granting the App workflow permission.

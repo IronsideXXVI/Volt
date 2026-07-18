@@ -52,6 +52,13 @@
 - July 17, 2026: Added generated Markdown release notes, GitHub-rendered HTML notes for Sparkle's update UI, a history-preserving appcast helper that deduplicates builds and retains 15 releases, XML validation, and preservation of existing `gh-pages` files.
 - July 17, 2026: Synchronized active and template release workflows, restored warning-clean core tests in the active build workflow, documented Depot/secrets/Pages/public-hosting setup, and added a first-production-release smoke-test checklist.
 
+## Visual system overhaul
+
+- July 18, 2026: Rebuilt the menu panel and Settings presentation around an adaptive electric-glass visual system while preserving provider, credential, refresh, and quota behavior. Added a layered backdrop, branded gradient treatment, shared icon tiles/status pills/section labels, more deliberate spacing, softer elevation, and provider-aware accenting in light and dark appearances.
+- July 18, 2026: Reworked the menu dashboard hierarchy with a richer product header, two-line provider switcher, live account summary, explicit usage/time legend, compact quota-window badges, labeled usage-vs-time tracks, stronger empty/loading/setup states, and a glass utility footer.
+- July 18, 2026: Rebuilt Settings as a wider control center with a translucent grouped sidebar, animated selection treatment, contextual page headers, provider connection summaries, numbered recommended import flows, visual default-provider choices, improved privacy/update cards, and persistent save/test controls.
+- July 18, 2026: Kept the canonical Icon Composer source and in-app logo unchanged. No credential, provider-service, normalization, or release behavior was modified by the redesign.
+
 ## Tests and validation
 
 - July 17, 2026: Added a standalone SwiftPM core target plus eleven redacted fixtures covering OpenAI weekly-only, main + Spark, primary + secondary, split feature windows, code review, credits and current/legacy spend control; Claude legacy fields, limits-only and dynamic scoped limits, extra usage, prepaid credits/bundles, and routine budget.
@@ -59,6 +66,7 @@
 - July 17, 2026: `swift test -Xswiftc -warnings-as-errors` passes all thirteen tests with Swift 6.3.3 on Linux. Every Swift file also passes compiler parser validation, and every JSON fixture parses successfully.
 - July 17, 2026: No live credentials or identity-bearing endpoint payloads were added to source, tests, fixtures, logs, or documentation. The canonical app icon and in-app logo were not modified.
 - July 18, 2026: Added fixed-time coverage for elapsed-window progress, percentage formatting, boundary clamping, and missing timing data. All fourteen warning-clean core tests pass with Swift 6.3.3 on Linux; all Swift sources remain parser-valid.
+- July 18, 2026: The electric-glass redesign passes repository whitespace checks and tree-sitter parsing for every Swift source. Core tests and the macOS Xcode build are delegated to PR validation because this sandbox does not include the Swift toolchain or macOS SDK.
 
 # Next verification
 

@@ -10,37 +10,51 @@ struct UsageRowView: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { timeline in
-            VStack(alignment: .leading, spacing: 9) {
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text(showsTitle ? window.title : "Quota used")
-                        .font(.system(size: showsTitle ? 12.5 : 10.5, weight: showsTitle ? .semibold : .medium))
-                        .foregroundStyle(showsTitle ? Color.primary : Color.secondary)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .center, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(showsTitle ? window.title : "Quota consumption")
+                            .font(.system(size: showsTitle ? 12.5 : 10.5, weight: showsTitle ? .semibold : .medium))
+                            .foregroundStyle(showsTitle ? Color.primary : Color.secondary)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        if showsTitle {
+                            Text("Provider-reported limit")
+                                .font(.system(size: 8.5, weight: .medium))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
 
                     Spacer(minLength: 8)
 
                     Text(window.percentageDescription)
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(.system(size: 11.5, weight: .bold, design: .rounded))
                         .foregroundStyle(metricColor)
                         .monospacedDigit()
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(metricColor.opacity(0.09), in: Capsule())
+                        .overlay {
+                            Capsule().strokeBorder(metricColor.opacity(0.15), lineWidth: 0.5)
+                        }
                         .fixedSize()
                 }
 
-                VStack(spacing: 5) {
-                    MetricBar(
+                VStack(spacing: 7) {
+                    metricLine(
+                        label: "USE",
                         value: window.barFraction,
                         tint: metricColor,
-                        height: 9,
-                        animatesChanges: !reduceMotion
+                        height: 9
                     )
 
                     if let elapsedFraction = window.windowElapsedFraction(at: timeline.date) {
-                        MetricBar(
+                        metricLine(
+                            label: "TIME",
                             value: elapsedFraction,
                             tint: VoltTheme.windowElapsed,
-                            height: 6,
-                            animatesChanges: !reduceMotion
+                            height: 6
                         )
                     }
                 }
@@ -51,6 +65,23 @@ struct UsageRowView: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(window.title)
             .accessibilityValue(accessibilityValue(now: timeline.date))
+        }
+    }
+
+    private func metricLine(label: String, value: Double, tint: Color, height: CGFloat) -> some View {
+        HStack(spacing: 8) {
+            Text(label)
+                .font(.system(size: 7.5, weight: .heavy, design: .rounded))
+                .tracking(0.4)
+                .foregroundStyle(tint)
+                .frame(width: 28, alignment: .leading)
+
+            MetricBar(
+                value: value,
+                tint: tint,
+                height: height,
+                animatesChanges: !reduceMotion
+            )
         }
     }
 
@@ -194,8 +225,15 @@ private struct MetricBar: View {
                     .fill(VoltTheme.track)
 
                 RoundedRectangle(cornerRadius: height / 2, style: .continuous)
-                    .fill(tint)
+                    .fill(
+                        LinearGradient(
+                            colors: [tint, tint.opacity(0.68)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
                     .frame(width: geometry.size.width * clampedValue)
+                    .shadow(color: tint.opacity(0.20), radius: 3)
             }
             .overlay {
                 RoundedRectangle(cornerRadius: height / 2, style: .continuous)

@@ -5,6 +5,28 @@ enum VoltTheme {
     static let primary = Color(hex: "FF00FF")
     static let alternate = Color(hex: "4C004A")
     static let track = Color.primary.opacity(0.10)
+    static let hairline = Color.primary.opacity(0.09)
+    static let panel = Color.primary.opacity(0.035)
+}
+
+extension AIProvider {
+    var systemImage: String {
+        switch self {
+        case .anthropic:
+            return "sparkles"
+        case .openAI:
+            return "brain.head.profile"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .anthropic:
+            return Color(hex: "E56B3F")
+        case .openAI:
+            return Color(hex: "168BFF")
+        }
+    }
 }
 
 extension Color {
@@ -41,7 +63,6 @@ enum VoltAssets {
             assertionFailure("Missing bundled applogo.png")
             return NSImage(size: NSSize(width: 1, height: 1))
         }
-
         return image
     }()
 }

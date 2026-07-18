@@ -1,5 +1,4 @@
 import Foundation
-import SwiftUI
 
 enum AIProvider: String, CaseIterable, Identifiable, Codable, Sendable {
     case anthropic
@@ -9,29 +8,33 @@ enum AIProvider: String, CaseIterable, Identifiable, Codable, Sendable {
 
     var displayName: String {
         switch self {
-        case .anthropic: "Claude"
-        case .openAI: "OpenAI"
+        case .anthropic:
+            return "Claude"
+        case .openAI:
+            return "OpenAI"
         }
     }
 
     var companyName: String {
         switch self {
-        case .anthropic: "Anthropic"
-        case .openAI: "OpenAI"
+        case .anthropic:
+            return "Anthropic"
+        case .openAI:
+            return "OpenAI"
         }
     }
+}
 
-    var systemImage: String {
-        switch self {
-        case .anthropic: "sparkles"
-        case .openAI: "brain.head.profile"
-        }
-    }
+enum UsageMetricDisplayMode: String, Codable, Sendable, Equatable {
+    case used
+    case remaining
 
-    var tint: Color {
+    var label: String {
         switch self {
-        case .anthropic: Color(hex: "F97316")
-        case .openAI: Color(hex: "168BFF")
+        case .used:
+            return "used"
+        case .remaining:
+            return "remaining"
         }
     }
 }
@@ -39,42 +42,136 @@ enum AIProvider: String, CaseIterable, Identifiable, Codable, Sendable {
 struct UsageWindow: Identifiable, Sendable {
     let id: String
     let title: String
+    /// Canonical provider utilization. All provider payloads are normalized to percent used.
     let usedPercent: Double
+    let displayMode: UsageMetricDisplayMode
     let resetsAt: Date?
     let duration: TimeInterval?
+    let sourceIdentifier: String?
+    let detail: String?
+    let isAllowed: Bool?
+    let isLimitReached: Bool?
+    let isActive: Bool?
 
-    var clampedUsedPercent: Double {
-        min(max(usedPercent, 0), 100)
+    init(
+        id: String,
+        title: String,
+        usedPercent: Double,
+        displayMode: UsageMetricDisplayMode,
+        resetsAt: Date?,
+        duration: TimeInterval?,
+        sourceIdentifier: String? = nil,
+        detail: String? = nil,
+        isAllowed: Bool? = nil,
+        isLimitReached: Bool? = nil,
+        isActive: Bool? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.usedPercent = usedPercent
+        self.displayMode = displayMode
+        self.resetsAt = resetsAt
+        self.duration = duration
+        self.sourceIdentifier = sourceIdentifier
+        self.detail = detail
+        self.isAllowed = isAllowed
+        self.isLimitReached = isLimitReached
+        self.isActive = isActive
     }
 
-    func elapsedPercent(at date: Date = Date()) -> Double? {
-        guard let resetsAt, let duration, duration > 0 else { return nil }
-        let remaining = resetsAt.timeIntervalSince(date)
-        if remaining <= 0 { return 100 }
-        return min(max((duration - remaining) / duration * 100, 0), 100)
+    var clampedUsedPercent: Double {
+        min(max(usedPercent.isFinite ? usedPercent : 0, 0), 100)
+    }
+
+    var remainingPercent: Double {
+        100 - clampedUsedPercent
+    }
+
+    var displayPercent: Double {
+        switch displayMode {
+        case .used:
+            return clampedUsedPercent
+        case .remaining:
+            return remainingPercent
+        }
+    }
+
+    var barFraction: Double {
+        displayPercent / 100
+    }
+
+    var percentageDescription: String {
+        "\(Int(displayPercent.rounded()))% \(displayMode.label)"
     }
 }
 
-struct CreditSummary: Sendable {
+struct UsageSection: Identifiable, Sendable {
+    let id: String
+    let title: String
+    let subtitle: String?
+    let windows: [UsageWindow]
+
+    init(id: String, title: String, subtitle: String? = nil, windows: [UsageWindow]) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.windows = windows
+    }
+}
+
+struct UsageDetailItem: Identifiable, Sendable {
+    let id: String
     let title: String
     let value: String
     let detail: String?
+
+    init(id: String, title: String, value: String, detail: String? = nil) {
+        self.id = id
+        self.title = title
+        self.value = value
+        self.detail = detail
+    }
+}
+
+struct UsageDetailSection: Identifiable, Sendable {
+    let id: String
+    let title: String
+    let items: [UsageDetailItem]
+}
+
+struct UsageNotice: Identifiable, Sendable {
+    enum Kind: String, Sendable, Equatable {
+        case information
+        case warning
+        case error
+    }
+
+    let id: String
+    let kind: Kind
+    let message: String
 }
 
 struct ProviderUsageSnapshot: Sendable {
     let provider: AIProvider
     let account: String?
     let plan: String?
-    let windows: [UsageWindow]
-    let credits: [CreditSummary]
+    let sections: [UsageSection]
+    let detailSections: [UsageDetailSection]
+    let notices: [UsageNotice]
     let updatedAt: Date
 
     var subtitle: String? {
         let values = [account, plan].compactMap { value -> String? in
-            guard let value, !value.isEmpty else { return nil }
+            guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
+                return nil
+            }
             return value
         }
         return values.isEmpty ? nil : values.joined(separator: " · ")
+    }
+
+    var windows: [UsageWindow] {
+        sections.flatMap(\.windows)
     }
 }
 
@@ -83,20 +180,26 @@ enum UsageServiceError: LocalizedError, Sendable {
     case invalidCredentials(AIProvider)
     case invalidResponse(AIProvider)
     case server(AIProvider, Int)
+    case claudeWebChallenge
+    case claudeOAuthScope
     case message(String)
 
     var errorDescription: String? {
         switch self {
         case let .notConfigured(provider):
-            "Configure \(provider.displayName) in Settings to view usage."
+            return "Configure \(provider.displayName) in Settings to view usage."
         case let .invalidCredentials(provider):
-            "\(provider.displayName) rejected the saved credentials. Update them in Settings."
+            return "\(provider.displayName) rejected the saved credentials. Update them in Settings."
         case let .invalidResponse(provider):
-            "Volt could not read the usage response returned by \(provider.displayName)."
+            return "Volt could not read the usage response returned by \(provider.displayName)."
         case let .server(provider, status):
-            "\(provider.displayName) returned HTTP \(status). Try again in a moment."
+            return "\(provider.displayName) returned HTTP \(status). Try again in a moment."
+        case .claudeWebChallenge:
+            return "Claude blocked the browser-session request. Import Claude Code credentials in Settings, or update the saved session key."
+        case .claudeOAuthScope:
+            return "The Claude OAuth token cannot read account usage. Run `claude login`, then import ~/.claude/.credentials.json again."
         case let .message(message):
-            message
+            return message
         }
     }
 }

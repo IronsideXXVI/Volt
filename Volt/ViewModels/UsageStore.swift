@@ -73,7 +73,11 @@ final class UsageStore {
                 guard let credentials = try CredentialStore.loadClaude() else {
                     throw UsageServiceError.notConfigured(provider)
                 }
-                snapshot = try await ClaudeUsageService.fetch(credentials: credentials)
+                let result = try await ClaudeUsageService.fetch(credentials: credentials)
+                snapshot = result.snapshot
+                if result.credentials != credentials {
+                    try CredentialStore.saveClaude(result.credentials)
+                }
             case .openAI:
                 guard let credentials = try CredentialStore.loadOpenAI() else {
                     throw UsageServiceError.notConfigured(provider)
@@ -97,7 +101,7 @@ final class UsageStore {
     }
 
     func claudeCredentials() throws -> ClaudeCredentials {
-        try CredentialStore.loadClaude() ?? ClaudeCredentials(organizationID: "", sessionKey: "")
+        try CredentialStore.loadClaude() ?? ClaudeCredentials()
     }
 
     func openAICredentials() throws -> OpenAICredentials {

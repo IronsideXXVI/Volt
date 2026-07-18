@@ -1,0 +1,46 @@
+{
+  "plan_type": "business",
+  "rate_limit": {
+    "allowed": false,
+    "limit_reached": true,
+    "primary_window": {
+      "used_percent": 100,
+      "limit_window_seconds": 18000,
+      "reset_after_seconds": 120
+    }
+  },
+  "code_review_rate_limit": {
+    "allowed": true,
+    "limit_reached": false,
+    "primary_window": {
+      "used_percent": 12,
+      "limit_window_seconds": 604800,
+      "reset_at": 1784700000
+    }
+  },
+  "spend_control": {
+    "reached": false,
+    "individual_limit": {
+      "source": "workspace_member",
+      "limit": "$100.00",
+      "used": "$25.00",
+      "remaining": "$75.00",
+      "used_percent": 25,
+      "remaining_percent": 75,
+      "reset_at": 1784800000
+    }
+  },
+  "rate_limit_reached_type": {
+    "type": "rate_limit_reached"
+  },
+  "overage_limit_reached": false,
+  "credits": {
+    "has_credits": true,
+    "unlimited": false,
+    "balance": "12.50",
+    "approx_local_messages": [
+      { "model": "codex", "messages": 25 }
+    ],
+    "approx_cloud_messages": [10]
+  }
+}

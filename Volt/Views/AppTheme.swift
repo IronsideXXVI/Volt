@@ -4,9 +4,9 @@ import SwiftUI
 enum VoltTheme {
     static let primary = Color(hex: "FF00FF")
     static let alternate = Color(hex: "4C004A")
-    static let track = Color.primary.opacity(0.10)
-    static let hairline = Color.primary.opacity(0.09)
-    static let panel = Color.primary.opacity(0.035)
+    static let track = Color.primary.opacity(0.12)
+    static let hairline = Color.primary.opacity(0.13)
+    static let panel = Color.primary.opacity(0.05)
 }
 
 extension AIProvider {

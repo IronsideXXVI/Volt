@@ -11,6 +11,7 @@ private struct OpenAIUsagePayload: Decodable, Sendable {
     let additionalRateLimits: [AdditionalRateLimit]
     let credits: Credits?
     let spendControl: SpendControl?
+    let individualLimit: IndividualLimit?
     let overageLimitReached: Bool?
     let rateLimitReachedType: String?
     let rateLimitResetCredits: JSONValue?
@@ -26,6 +27,8 @@ private struct OpenAIUsagePayload: Decodable, Sendable {
         case additionalRateLimits = "additional_rate_limits"
         case credits
         case spendControl = "spend_control"
+        case individualLimit = "individual_limit"
+        case individualLimitCamel = "individualLimit"
         case overageLimitReached = "overage_limit_reached"
         case rateLimitReachedType = "rate_limit_reached_type"
         case rateLimitResetCredits = "rate_limit_reset_credits"
@@ -43,8 +46,11 @@ private struct OpenAIUsagePayload: Decodable, Sendable {
             codeReviewRateLimit = limit
         } else if let limit = try? container.decodeIfPresent(RateLimit.self, forKey: .codeReviewRateLimits) {
             codeReviewRateLimit = limit
-        } else if let limits = try? container.decodeIfPresent([RateLimit].self, forKey: .codeReviewRateLimits) {
-            codeReviewRateLimit = limits.first
+        } else if let limits = try? container.decodeIfPresent(
+            [LossyDecodable<RateLimit>].self,
+            forKey: .codeReviewRateLimits
+        ) {
+            codeReviewRateLimit = limits.compactMap(\.value).first
         } else {
             codeReviewRateLimit = nil
         }
@@ -55,6 +61,8 @@ private struct OpenAIUsagePayload: Decodable, Sendable {
         ))?.compactMap(\.value) ?? []
         credits = try? container.decodeIfPresent(Credits.self, forKey: .credits)
         spendControl = try? container.decodeIfPresent(SpendControl.self, forKey: .spendControl)
+        individualLimit = (try? container.decodeIfPresent(IndividualLimit.self, forKey: .individualLimit))
+            ?? (try? container.decodeIfPresent(IndividualLimit.self, forKey: .individualLimitCamel))
         overageLimitReached = container.flexibleBool(forKey: .overageLimitReached)
         rateLimitReachedType = Self.decodeReachedType(container: container)
         rateLimitResetCredits = try? container.decodeIfPresent(JSONValue.self, forKey: .rateLimitResetCredits)
@@ -77,12 +85,15 @@ private struct OpenAIUsagePayload: Decodable, Sendable {
         let limitReached: Bool?
         let primaryWindow: Window?
         let secondaryWindow: Window?
+        let individualLimit: IndividualLimit?
 
         enum CodingKeys: String, CodingKey {
             case allowed
             case limitReached = "limit_reached"
             case primaryWindow = "primary_window"
             case secondaryWindow = "secondary_window"
+            case individualLimit = "individual_limit"
+            case individualLimitCamel = "individualLimit"
         }
 
         init(from decoder: Decoder) throws {
@@ -91,6 +102,8 @@ private struct OpenAIUsagePayload: Decodable, Sendable {
             limitReached = container.flexibleBool(forKey: .limitReached)
             primaryWindow = try? container.decodeIfPresent(Window.self, forKey: .primaryWindow)
             secondaryWindow = try? container.decodeIfPresent(Window.self, forKey: .secondaryWindow)
+            individualLimit = (try? container.decodeIfPresent(IndividualLimit.self, forKey: .individualLimit))
+                ?? (try? container.decodeIfPresent(IndividualLimit.self, forKey: .individualLimitCamel))
         }
     }
 
@@ -136,6 +149,13 @@ private struct OpenAIUsagePayload: Decodable, Sendable {
             case feature = "metered_feature"
             case rateLimit = "rate_limit"
         }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            name = try? container.decodeIfPresent(String.self, forKey: .name)
+            feature = try? container.decodeIfPresent(String.self, forKey: .feature)
+            rateLimit = try? container.decodeIfPresent(RateLimit.self, forKey: .rateLimit)
+        }
     }
 
     struct Credits: Decodable, Sendable {
@@ -176,12 +196,14 @@ private struct OpenAIUsagePayload: Decodable, Sendable {
         enum CodingKeys: String, CodingKey {
             case reached
             case individualLimit = "individual_limit"
+            case individualLimitCamel = "individualLimit"
         }
 
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             reached = container.flexibleBool(forKey: .reached)
-            individualLimit = try? container.decodeIfPresent(IndividualLimit.self, forKey: .individualLimit)
+            individualLimit = (try? container.decodeIfPresent(IndividualLimit.self, forKey: .individualLimit))
+                ?? (try? container.decodeIfPresent(IndividualLimit.self, forKey: .individualLimitCamel))
         }
     }
 
@@ -201,10 +223,14 @@ private struct OpenAIUsagePayload: Decodable, Sendable {
             case used
             case remaining
             case usedPercent = "used_percent"
+            case usedPercentCamel = "usedPercent"
             case remainingPercent = "remaining_percent"
+            case remainingPercentCamel = "remainingPercent"
             case resetAt = "reset_at"
             case resetsAt = "resets_at"
+            case resetsAtCamel = "resetsAt"
             case resetAfterSeconds = "reset_after_seconds"
+            case resetAfterSecondsCamel = "resetAfterSeconds"
         }
 
         init(from decoder: Decoder) throws {
@@ -214,16 +240,39 @@ private struct OpenAIUsagePayload: Decodable, Sendable {
             used = container.flexibleString(forKey: .used)
             remaining = container.flexibleString(forKey: .remaining)
             usedPercent = container.flexibleDouble(forKey: .usedPercent)
+                ?? container.flexibleDouble(forKey: .usedPercentCamel)
             remainingPercent = container.flexibleDouble(forKey: .remainingPercent)
+                ?? container.flexibleDouble(forKey: .remainingPercentCamel)
             resetAt = container.flexibleDate(forKey: .resetAt)
                 ?? container.flexibleDate(forKey: .resetsAt)
+                ?? container.flexibleDate(forKey: .resetsAtCamel)
             resetAfterSeconds = container.flexibleDouble(forKey: .resetAfterSeconds)
+                ?? container.flexibleDouble(forKey: .resetAfterSecondsCamel)
+        }
+
+        var derivedUsedPercent: Double? {
+            if let usedPercent, usedPercent.isFinite { return usedPercent }
+            if let remainingPercent, remainingPercent.isFinite { return 100 - remainingPercent }
+            guard let limitValue = Self.numericAmount(limit), limitValue > 0 else { return nil }
+            if let usedValue = Self.numericAmount(used) {
+                return usedValue / limitValue * 100
+            }
+            if let remainingValue = Self.numericAmount(remaining) {
+                return (1 - remainingValue / limitValue) * 100
+            }
+            return nil
         }
 
         func resolvedResetDate(now: Date) -> Date? {
             if let resetAt { return resetAt }
             guard let resetAfterSeconds, resetAfterSeconds > 0 else { return nil }
             return now.addingTimeInterval(resetAfterSeconds)
+        }
+
+        private static func numericAmount(_ value: String?) -> Double? {
+            guard let value else { return nil }
+            let allowed = value.filter { $0.isNumber || $0 == "." || $0 == "-" }
+            return Double(allowed)
         }
     }
 }
@@ -333,6 +382,7 @@ private extension KeyedDecodingContainer {
 
 private enum OpenAIRequestError: Error {
     case unauthorized
+    case rateLimited(Date?)
     case status(Int)
     case invalidResponse
 }
@@ -363,24 +413,31 @@ enum OpenAIUsageNormalizer {
                 sections.append(UsageSection(
                     id: "openai-plan-limits",
                     title: "Plan usage limits",
-                    subtitle: "Quota available in your current Codex plan",
+                    subtitle: "Current Codex plan quotas",
                     windows: windows
                 ))
             }
         }
 
         let additionalWindows = payload.additionalRateLimits.enumerated().flatMap { index, additional in
-            let rawName = nonEmpty(additional.name)
-                ?? nonEmpty(additional.feature)
-                ?? "Additional limit"
-            let baseName = rawName == additional.feature ? readableName(rawName) : rawName
+            let explicitName = nonEmpty(additional.name)
+            let feature = nonEmpty(additional.feature)
+            let baseName = explicitName ?? feature.map(readableName) ?? "Additional limit"
             guard let rateLimit = additional.rateLimit else { return [UsageWindow]() }
-            let identity = nonEmpty(additional.feature) ?? nonEmpty(additional.name) ?? "limit-\(index)"
+            let identity: String
+            if let feature, let explicitName,
+               feature.caseInsensitiveCompare(explicitName) != .orderedSame {
+                identity = "\(feature)-\(explicitName)"
+            } else {
+                identity = feature ?? explicitName ?? "limit-\(index)"
+            }
+            let identitySlug = slug(identity)
+            let stableIdentity = identitySlug.isEmpty ? "limit-\(index)" : identitySlug
             return normalizedWindows(
                 from: rateLimit,
-                idPrefix: "openai-feature-\(slug(identity))",
+                idPrefix: "openai-feature-\(stableIdentity)",
                 baseTitle: baseName,
-                sourceIdentifier: identity,
+                sourceIdentifier: feature ?? explicitName ?? identity,
                 now: now
             )
         }
@@ -388,7 +445,7 @@ enum OpenAIUsageNormalizer {
             sections.append(UsageSection(
                 id: "openai-model-limits",
                 title: "Model & feature limits",
-                windows: deduplicated(additionalWindows)
+                windows: sortedByDuration(deduplicated(additionalWindows))
             ))
         }
 
@@ -409,35 +466,36 @@ enum OpenAIUsageNormalizer {
             }
         }
 
-        if let spend = payload.spendControl?.individualLimit {
-            let usedPercent = spend.usedPercent ?? spend.remainingPercent.map { 100 - $0 }
-            if let usedPercent, usedPercent.isFinite {
-                let amountDetail: String?
-                if let remaining = nonEmpty(spend.remaining), let limit = nonEmpty(spend.limit) {
-                    amountDetail = "\(remaining) remaining of \(limit)"
-                } else if let used = nonEmpty(spend.used), let limit = nonEmpty(spend.limit) {
-                    amountDetail = "\(used) used of \(limit)"
-                } else {
-                    amountDetail = nil
-                }
-                let title = nonEmpty(spend.source).map(readableName) ?? "Workspace limit"
-                sections.append(UsageSection(
-                    id: "openai-spend-control",
-                    title: "Spend control",
-                    windows: [UsageWindow(
-                        id: "openai-spend-control-individual",
-                        title: title,
-                        usedPercent: usedPercent,
-                        displayMode: .remaining,
-                        resetsAt: spend.resolvedResetDate(now: now),
-                        duration: nil,
-                        sourceIdentifier: spend.source,
-                        detail: amountDetail,
-                        isAllowed: payload.spendControl?.reached.map { !$0 },
-                        isLimitReached: payload.spendControl?.reached
-                    )]
-                ))
+        let spend = payload.spendControl?.individualLimit
+            ?? payload.rateLimit?.individualLimit
+            ?? payload.individualLimit
+        if let spend, let usedPercent = spend.derivedUsedPercent, usedPercent.isFinite {
+            let amountDetail: String?
+            if let remaining = nonEmpty(spend.remaining), let limit = nonEmpty(spend.limit) {
+                amountDetail = "\(remaining) remaining of \(limit)"
+            } else if let used = nonEmpty(spend.used), let limit = nonEmpty(spend.limit) {
+                amountDetail = "\(used) used of \(limit)"
+            } else {
+                amountDetail = nil
             }
+            let reached = payload.spendControl?.reached ?? (usedPercent >= 100 ? true : nil)
+            let title = nonEmpty(spend.source).map(readableName) ?? "Workspace limit"
+            sections.append(UsageSection(
+                id: "openai-spend-control",
+                title: "Spend control",
+                windows: [UsageWindow(
+                    id: "openai-spend-control-individual",
+                    title: title,
+                    usedPercent: usedPercent,
+                    displayMode: .remaining,
+                    resetsAt: spend.resolvedResetDate(now: now),
+                    duration: nil,
+                    sourceIdentifier: spend.source,
+                    detail: amountDetail,
+                    isAllowed: reached.map { !$0 },
+                    isLimitReached: reached
+                )]
+            ))
         }
 
         var detailSections: [UsageDetailSection] = []
@@ -446,7 +504,7 @@ enum OpenAIUsageNormalizer {
             let creditValue: String
             if credits.unlimited {
                 creditValue = "Unlimited"
-            } else if let balance = nonEmpty(credits.balance) {
+            } else if credits.hasCredits, let balance = nonEmpty(credits.balance) {
                 creditValue = balance
             } else if credits.hasCredits {
                 creditValue = "Available"
@@ -491,7 +549,9 @@ enum OpenAIUsageNormalizer {
                 message: "The current Codex plan limit has been reached."
             ))
         }
-        if payload.spendControl?.reached == true {
+        let spendLimitReached = payload.spendControl?.reached == true
+            || (spend?.derivedUsedPercent ?? 0) >= 100
+        if spendLimitReached {
             notices.append(UsageNotice(
                 id: "openai-spend-limit-reached",
                 kind: .warning,
@@ -505,7 +565,9 @@ enum OpenAIUsageNormalizer {
                 message: "The account overage limit has been reached."
             ))
         }
-        if let reachedType = nonEmpty(payload.rateLimitReachedType) {
+        if let reachedType = nonEmpty(payload.rateLimitReachedType),
+           !(reachedType.caseInsensitiveCompare("rate_limit_reached") == .orderedSame
+             && (payload.rateLimit?.allowed == false || payload.rateLimit?.limitReached == true)) {
             notices.append(UsageNotice(
                 id: "openai-reached-\(slug(reachedType))",
                 kind: .warning,
@@ -556,13 +618,33 @@ enum OpenAIUsageNormalizer {
         let available = candidates.compactMap { key, window -> (String, OpenAIUsagePayload.Window)? in
             guard let window, let used = window.usedPercent, used.isFinite else { return nil }
             return (key, window)
+        }.sorted { left, right in
+            switch (left.1.duration, right.1.duration) {
+            case let (lhs?, rhs?) where lhs != rhs:
+                return lhs < rhs
+            case (_?, nil):
+                return true
+            case (nil, _?):
+                return false
+            default:
+                return left.0 < right.0
+            }
         }
+        let semanticKeys = available.map { key, window in
+            periodIdentifier(for: window.duration) ?? key
+        }
+        let keyCounts = Dictionary(grouping: semanticKeys, by: { $0 }).mapValues(\.count)
 
-        return available.map { key, window in
-            let windowTitle = title(for: window.duration, fallback: key == "primary" ? "Current limit" : "Long-term limit")
+        return available.enumerated().map { index, candidate in
+            let (key, window) = candidate
+            let windowTitle = title(
+                for: window.duration,
+                fallback: key == "primary" ? "Current limit" : "Long-term limit"
+            )
             let title: String
             if let baseTitle {
-                title = available.count == 1 ? baseTitle : "\(baseTitle) · \(shortTitle(for: window.duration, fallback: key))"
+                let period = shortTitle(for: window.duration, fallback: "")
+                title = period.isEmpty ? baseTitle : "\(baseTitle) · \(period)"
             } else {
                 title = windowTitle
             }
@@ -570,12 +652,16 @@ enum OpenAIUsageNormalizer {
             if rateLimit.limitReached == true {
                 statusDetail = "Limit reached"
             } else if rateLimit.allowed == false {
-                statusDetail = "Usage currently unavailable"
+                statusDetail = "Currently unavailable"
             } else {
                 statusDetail = nil
             }
+            let semanticKey = semanticKeys[index]
+            let idSuffix = keyCounts[semanticKey, default: 0] > 1
+                ? "\(semanticKey)-\(key)"
+                : semanticKey
             return UsageWindow(
-                id: "\(idPrefix)-\(key)",
+                id: "\(idPrefix)-\(idSuffix)",
                 title: title,
                 usedPercent: window.usedPercent ?? 0,
                 displayMode: .remaining,
@@ -590,17 +676,35 @@ enum OpenAIUsageNormalizer {
     }
 
     private static func title(for duration: TimeInterval?, fallback: String) -> String {
-        guard let duration, duration > 0 else { return fallback }
-        if duration <= 6 * 60 * 60 { return "5-hour limit" }
-        if duration <= 36 * 60 * 60 { return "Daily limit" }
-        if duration <= 15 * 24 * 60 * 60 { return "Weekly limit" }
-        if duration <= 45 * 24 * 60 * 60 { return "Monthly limit" }
-        return fallback
+        let period = shortTitle(for: duration, fallback: "")
+        guard !period.isEmpty else { return fallback }
+        return "\(period) limit"
     }
 
     private static func shortTitle(for duration: TimeInterval?, fallback: String) -> String {
-        let full = title(for: duration, fallback: fallback == "primary" ? "Primary" : "Secondary")
-        return full.replacingOccurrences(of: " limit", with: "")
+        guard let duration, duration > 0 else {
+            return fallback == "primary" ? "Primary" : (fallback == "secondary" ? "Secondary" : fallback)
+        }
+        let hours = duration / (60 * 60)
+        let days = duration / (24 * 60 * 60)
+        if abs(hours - 5) < 0.01 { return "5-hour" }
+        if abs(days - 1) < 0.01 { return "Daily" }
+        if abs(days - 7) < 0.01 { return "Weekly" }
+        if abs(days - 30) < 1 { return "Monthly" }
+        if hours < 48 {
+            return "\(formattedWholeNumber(hours))-hour"
+        }
+        return "\(formattedWholeNumber(days))-day"
+    }
+
+    private static func periodIdentifier(for duration: TimeInterval?) -> String? {
+        guard let duration, duration > 0 else { return nil }
+        return slug(shortTitle(for: duration, fallback: "window"))
+    }
+
+    private static func formattedWholeNumber(_ value: Double) -> String {
+        if abs(value.rounded() - value) < 0.01 { return String(Int(value.rounded())) }
+        return String(format: "%.1f", value)
     }
 
     private static func messageEstimate(_ values: [JSONValue]) -> String? {
@@ -629,6 +733,21 @@ enum OpenAIUsageNormalizer {
     private static func deduplicated(_ windows: [UsageWindow]) -> [UsageWindow] {
         var seen = Set<String>()
         return windows.filter { seen.insert($0.id).inserted }
+    }
+
+    private static func sortedByDuration(_ windows: [UsageWindow]) -> [UsageWindow] {
+        windows.sorted { left, right in
+            switch (left.duration, right.duration) {
+            case let (lhs?, rhs?) where lhs != rhs:
+                return lhs < rhs
+            case (_?, nil):
+                return true
+            case (nil, _?):
+                return false
+            default:
+                return left.title.localizedCaseInsensitiveCompare(right.title) == .orderedAscending
+            }
+        }
     }
 
     private static func deduplicatedNotices(_ notices: [UsageNotice]) -> [UsageNotice] {
@@ -660,9 +779,12 @@ enum OpenAIUsageNormalizer {
 
     private static func readableName(_ raw: String) -> String {
         raw.replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
             .split(separator: " ")
             .map { word in
                 let value = String(word)
+                let lower = value.lowercased()
+                if ["ai", "api", "gpt", "oauth"].contains(lower) { return lower.uppercased() }
                 if value.uppercased() == value && value.count > 1 { return value }
                 return value.prefix(1).uppercased() + value.dropFirst()
             }
@@ -701,6 +823,8 @@ enum OpenAIUsageService {
                 throw UsageServiceError.invalidCredentials(.openAI)
             } catch OpenAIRequestError.invalidResponse {
                 throw UsageServiceError.invalidResponse(.openAI)
+            } catch OpenAIRequestError.rateLimited(let retryAfter) {
+                throw UsageServiceError.rateLimited(.openAI, retryAfter)
             } catch OpenAIRequestError.status(let status) {
                 throw UsageServiceError.server(.openAI, status)
             }
@@ -708,6 +832,8 @@ enum OpenAIUsageService {
             throw UsageServiceError.invalidCredentials(.openAI)
         } catch OpenAIRequestError.invalidResponse {
             throw UsageServiceError.invalidResponse(.openAI)
+        } catch OpenAIRequestError.rateLimited(let retryAfter) {
+            throw UsageServiceError.rateLimited(.openAI, retryAfter)
         } catch OpenAIRequestError.status(let status) {
             throw UsageServiceError.server(.openAI, status)
         }
@@ -736,6 +862,8 @@ enum OpenAIUsageService {
             return data
         case 401, 403:
             throw OpenAIRequestError.unauthorized
+        case 429:
+            throw OpenAIRequestError.rateLimited(retryAfterDate(from: response))
         default:
             throw OpenAIRequestError.status(response.statusCode)
         }
@@ -768,6 +896,9 @@ enum OpenAIUsageService {
             if response.statusCode == 400 || response.statusCode == 401 || response.statusCode == 403 {
                 throw UsageServiceError.invalidCredentials(.openAI)
             }
+            if response.statusCode == 429 {
+                throw UsageServiceError.rateLimited(.openAI, retryAfterDate(from: response))
+            }
             throw UsageServiceError.server(.openAI, response.statusCode)
         }
 
@@ -778,5 +909,22 @@ enum OpenAIUsageService {
             accountID: credentials.accountID,
             lastRefresh: Date()
         )
+    }
+
+    private static func retryAfterDate(from response: HTTPURLResponse, now: Date = Date()) -> Date? {
+        guard let value = response.value(forHTTPHeaderField: "Retry-After")?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            !value.isEmpty
+        else {
+            return nil
+        }
+        if let seconds = TimeInterval(value), seconds >= 0 {
+            return now.addingTimeInterval(seconds)
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "EEE',' dd MMM yyyy HH':'mm':'ss zzz"
+        return formatter.date(from: value)
     }
 }

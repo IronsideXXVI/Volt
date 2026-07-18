@@ -22,7 +22,7 @@ final class UsageNormalizerTests: XCTestCase {
         XCTAssertEqual(window.usedPercent, 43, accuracy: 0.001)
         XCTAssertEqual(window.remainingPercent, 57, accuracy: 0.001)
         XCTAssertEqual(window.displayPercent, 57, accuracy: 0.001)
-        XCTAssertEqual(window.barFraction, 0.57, accuracy: 0.001)
+        XCTAssertEqual(window.barFraction, 0.43, accuracy: 0.001)
         XCTAssertEqual(window.displayMode, .remaining)
         XCTAssertEqual(snapshot.plan, "Pro 5x")
         XCTAssertEqual(try XCTUnwrap(window.resetsAt).timeIntervalSince1970, 1_784_500_000, accuracy: 0.001)
@@ -35,8 +35,8 @@ final class UsageNormalizerTests: XCTestCase {
         )
 
         XCTAssertEqual(snapshot.sections.count, 2)
-        XCTAssertEqual(snapshot.windows.map(\.title), ["Weekly limit", "GPT-5.3-Codex-Spark"])
-        let spark = try XCTUnwrap(snapshot.windows.first(where: { $0.title == "GPT-5.3-Codex-Spark" }))
+        XCTAssertEqual(snapshot.windows.map(\.title), ["Weekly limit", "GPT-5.3-Codex-Spark · Weekly"])
+        let spark = try XCTUnwrap(snapshot.windows.first(where: { $0.sourceIdentifier == "codex_bengalfox" }))
         XCTAssertEqual(spark.displayPercent, 100, accuracy: 0.001)
         XCTAssertEqual(spark.sourceIdentifier, "codex_bengalfox")
     }
@@ -68,6 +68,8 @@ final class UsageNormalizerTests: XCTestCase {
 
         let spend = try XCTUnwrap(snapshot.sections.first(where: { $0.id == "openai-spend-control" }))
         XCTAssertEqual(try XCTUnwrap(spend.windows.first).displayPercent, 75, accuracy: 0.001)
+        XCTAssertEqual(snapshot.sections.first?.windows.first?.quotaState, .exhausted)
+        XCTAssertEqual(snapshot.notices.count, 1)
         XCTAssertTrue(snapshot.notices.contains(where: { $0.id == "openai-plan-limit-reached" }))
         XCTAssertTrue(snapshot.detailSections.contains(where: { $0.id == "openai-credits" }))
     }
@@ -77,6 +79,62 @@ final class UsageNormalizerTests: XCTestCase {
         XCTAssertEqual(OpenAIUsageNormalizer.planDisplayName("pro"), "Pro 20x")
         XCTAssertEqual(OpenAIUsageNormalizer.planDisplayName("free_workspace"), "Free workspace")
         XCTAssertEqual(OpenAIUsageNormalizer.planDisplayName("future_plan"), "Future Plan")
+    }
+
+    func testBarsAlwaysRepresentConsumedQuota() {
+        let window = UsageWindow(
+            id: "remaining-example",
+            title: "Weekly limit",
+            usedPercent: 90,
+            displayMode: .remaining,
+            resetsAt: nil,
+            duration: nil
+        )
+
+        XCTAssertEqual(window.displayPercent, 10, accuracy: 0.001)
+        XCTAssertEqual(window.percentageDescription, "10% remaining")
+        XCTAssertEqual(window.barFraction, 0.9, accuracy: 0.001)
+        XCTAssertEqual(window.accessibilityDescription, "90% used, 10% remaining")
+        XCTAssertEqual(window.quotaState, .critical)
+
+        let almostUsed = UsageWindow(
+            id: "almost-used",
+            title: "Session",
+            usedPercent: 99.6,
+            displayMode: .used,
+            resetsAt: nil,
+            duration: nil
+        )
+        XCTAssertEqual(almostUsed.percentageDescription, ">99% used")
+        XCTAssertEqual(almostUsed.barFraction, 0.996, accuracy: 0.001)
+    }
+
+    func testOpenAISortsSplitFeatureWindowsAndReadsCurrentSpendShape() throws {
+        let snapshot = try OpenAIUsageNormalizer.snapshot(
+            from: fixture("openai-split-feature-current-spend"),
+            credentials: fixtureCredentials
+        )
+
+        let plan = try XCTUnwrap(snapshot.sections.first(where: { $0.id == "openai-plan-limits" }))
+        XCTAssertEqual(plan.windows.map(\.title), ["5-hour limit", "Weekly limit"])
+        XCTAssertEqual(plan.windows.map(\.barFraction), [0.2, 0.9])
+
+        let features = try XCTUnwrap(snapshot.sections.first(where: { $0.id == "openai-model-limits" }))
+        XCTAssertEqual(features.windows.map(\.title), [
+            "GPT-5.3-Codex-Spark · 5-hour",
+            "Future Feature · Daily",
+            "GPT-5.3-Codex-Spark · Weekly",
+        ])
+        XCTAssertEqual(Set(features.windows.map(\.id)).count, 3)
+
+        let spend = try XCTUnwrap(snapshot.sections.first(where: { $0.id == "openai-spend-control" })?.windows.first)
+        XCTAssertEqual(spend.usedPercent, 25, accuracy: 0.001)
+        XCTAssertEqual(spend.displayPercent, 75, accuracy: 0.001)
+        XCTAssertEqual(spend.barFraction, 0.25, accuracy: 0.001)
+        XCTAssertEqual(spend.detail, "25 used of 100")
+
+        let credits = try XCTUnwrap(snapshot.detailSections.first(where: { $0.id == "openai-credits" }))
+        XCTAssertEqual(credits.items.first?.value, "Not available")
     }
 
     func testClaudeLegacyFieldsUsePercentUsedAndPreserveFeatures() throws {
@@ -119,6 +177,29 @@ final class UsageNormalizerTests: XCTestCase {
         XCTAssertTrue(features.windows.contains(where: { $0.title == "Future model" }))
     }
 
+    func testClaudeLimitsOnlyPayloadKeepsAllModelsAndMarksInactiveScopes() throws {
+        let snapshot = try ClaudeUsageNormalizer.snapshot(
+            from: fixture("claude-limits-only"),
+            account: nil,
+            plan: nil
+        )
+
+        let weekly = try XCTUnwrap(snapshot.sections.first(where: { $0.id == "claude-weekly-limits" }))
+        XCTAssertEqual(weekly.windows.filter { $0.title == "All models" }.count, 1)
+        XCTAssertTrue(weekly.windows.contains(where: { $0.title == "Sonnet only" && $0.usedPercent == 44 }))
+
+        let inactive = try XCTUnwrap(weekly.windows.first(where: { $0.title == "Claude Sonnet Preview only" }))
+        XCTAssertEqual(inactive.quotaState, .inactive)
+        XCTAssertEqual(inactive.statusDescription, "Inactive")
+
+        let features = try XCTUnwrap(snapshot.sections.first(where: { $0.id == "claude-feature-limits" }))
+        let routines = try XCTUnwrap(features.windows.first(where: { $0.title == "Daily Routines" }))
+        XCTAssertEqual(routines.duration, 24 * 60 * 60)
+
+        let extra = try XCTUnwrap(snapshot.detailSections.first(where: { $0.id == "claude-extra-usage" }))
+        XCTAssertEqual(extra.items.map(\.value), ["Off"])
+    }
+
     func testClaudeAuxiliaryEndpointsNormalizeIntoDetailRows() throws {
         let auxiliary = ClaudeUsageNormalizer.auxiliaryUsage(
             creditsData: try fixture("claude-prepaid-credits"),
@@ -157,6 +238,43 @@ final class UsageNormalizerTests: XCTestCase {
             ClaudeUsageNormalizer.planDisplayName(subscriptionType: "pro", rateLimitTier: nil),
             "Claude Pro"
         )
+    }
+
+    func testCredentialImportsNormalizeWhitespaceAndDates() throws {
+        let claude = try ClaudeCredentials.imported(from: Data(#"""
+        {
+          "claudeAiOauth": {
+            "accessToken": "  fixture-claude-access  ",
+            "refreshToken": "  fixture-claude-refresh  ",
+            "expiresAt": 1785000000000,
+            "scopes": ["user:profile"],
+            "rateLimitTier": " default_claude_max_20x ",
+            "subscriptionType": " max "
+          }
+        }
+        """#.utf8))
+        XCTAssertEqual(claude.oauthAccessToken, "fixture-claude-access")
+        XCTAssertEqual(claude.oauthRefreshToken, "fixture-claude-refresh")
+        XCTAssertEqual(claude.oauthRateLimitTier, "default_claude_max_20x")
+        XCTAssertEqual(claude.oauthSubscriptionType, "max")
+        XCTAssertEqual(try XCTUnwrap(claude.oauthExpiresAt).timeIntervalSince1970, 1_785_000_000, accuracy: 0.001)
+
+        let openAI = try OpenAICredentials.imported(from: Data(#"""
+        {
+          "tokens": {
+            "access_token": "  fixture-openai-access  ",
+            "refresh_token": "  fixture-openai-refresh  ",
+            "id_token": "  fixture-openai-id  ",
+            "account_id": "  fixture-account  "
+          },
+          "last_refresh": "2026-07-17T20:15:30Z"
+        }
+        """#.utf8))
+        XCTAssertEqual(openAI.accessToken, "fixture-openai-access")
+        XCTAssertEqual(openAI.refreshToken, "fixture-openai-refresh")
+        XCTAssertEqual(openAI.idToken, "fixture-openai-id")
+        XCTAssertEqual(openAI.accountID, "fixture-account")
+        XCTAssertNotNil(openAI.lastRefresh)
     }
 
     private func fixture(_ name: String) throws -> Data {

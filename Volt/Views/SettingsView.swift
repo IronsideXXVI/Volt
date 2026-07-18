@@ -30,8 +30,19 @@ private enum SettingsPane: String, CaseIterable, Identifiable, Equatable {
 }
 
 private struct SettingsStatus {
+    enum Kind: Equatable {
+        case information
+        case success
+        case error
+    }
+
     let message: String
-    let isError: Bool
+    let kind: Kind
+
+    init(message: String, kind: Kind) {
+        self.message = message
+        self.kind = kind
+    }
 }
 
 struct SettingsView: View {
@@ -55,6 +66,17 @@ struct SettingsView: View {
     @State private var openAILastRefresh: Date?
 
     @State private var statuses: [AIProvider: SettingsStatus] = [:]
+    @State private var testingProviders: Set<AIProvider> = []
+    @State private var dirtyProviders: Set<AIProvider> = []
+    @State private var didLoadCredentials = false
+    @State private var savedClaudeCredentials = ClaudeCredentials()
+    @State private var savedOpenAICredentials = OpenAICredentials(
+        accessToken: "",
+        refreshToken: "",
+        idToken: "",
+        accountID: "",
+        lastRefresh: nil
+    )
     @State private var providerToDisconnect: AIProvider?
 
     var body: some View {
@@ -63,9 +85,16 @@ struct SettingsView: View {
             Divider()
             paneContent
         }
-        .frame(width: 720, height: 470)
+        .frame(width: 740, height: 500)
         .background(Color(nsColor: .windowBackgroundColor))
+        .tint(VoltTheme.primary)
         .onAppear(perform: loadCredentials)
+        .onChange(of: draftClaudeCredentials) { _, credentials in
+            updateDirtyState(.anthropic, isDirty: credentials != savedClaudeCredentials)
+        }
+        .onChange(of: draftOpenAICredentials) { _, credentials in
+            updateDirtyState(.openAI, isDirty: credentials != savedOpenAICredentials)
+        }
         .confirmationDialog(
             "Disconnect \(providerToDisconnect?.displayName ?? "provider")?",
             isPresented: Binding(
@@ -445,6 +474,8 @@ struct SettingsView: View {
                 Text(connectionDetail(for: provider))
                     .font(.system(size: 10.5))
                     .foregroundStyle(.secondary)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
             Circle()
@@ -457,14 +488,22 @@ struct SettingsView: View {
 
     @ViewBuilder
     private func statusBanner(for provider: AIProvider) -> some View {
-        if let status = statuses[provider] {
-            Label(
-                status.message,
-                systemImage: status.isError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill"
-            )
-            .font(.system(size: 10.5))
-            .foregroundStyle(status.isError ? Color.orange : Color.green)
-            .fixedSize(horizontal: false, vertical: true)
+        if let status = statuses[provider],
+           !(dirtyProviders.contains(provider) && status.kind == .success) {
+            let symbol: String = switch status.kind {
+            case .information: "info.circle.fill"
+            case .success: "checkmark.circle.fill"
+            case .error: "exclamationmark.triangle.fill"
+            }
+            let color: Color = switch status.kind {
+            case .information: provider.tint
+            case .success: .green
+            case .error: .orange
+            }
+            Label(status.message, systemImage: symbol)
+                .font(.system(size: 10.5))
+                .foregroundStyle(color)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -473,25 +512,40 @@ struct SettingsView: View {
             Button("Disconnect…", role: .destructive) {
                 providerToDisconnect = provider
             }
-            .disabled(!store.isConfigured(provider))
+            .disabled(
+                (!store.isConfigured(provider) && statuses[provider]?.kind != .error)
+                    || testingProviders.contains(provider)
+            )
 
             Spacer()
 
-            Button("Save & Test", action: save)
-                .buttonStyle(.borderedProminent)
-                .tint(provider.tint)
-                .disabled(store.isLoading(provider))
+            Button(action: save) {
+                HStack(spacing: 6) {
+                    if testingProviders.contains(provider) {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    Text(testingProviders.contains(provider) ? "Testing…" : "Save & Test")
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(provider.tint)
+            .disabled(store.isLoading(provider) || testingProviders.contains(provider))
         }
     }
 
     private func connectionTitle(for provider: AIProvider) -> String {
-        if store.isLoading(provider) { return "Testing connection…" }
+        if testingProviders.contains(provider) || store.isLoading(provider) { return "Testing connection…" }
+        if dirtyProviders.contains(provider) { return "Unsaved changes" }
         if store.snapshot(for: provider) != nil, store.error(for: provider) == nil { return "Connected" }
         if store.isConfigured(provider) { return "Credentials saved" }
         return "Not connected"
     }
 
     private func connectionDetail(for provider: AIProvider) -> String {
+        if dirtyProviders.contains(provider) {
+            return "Save and test these changes before they are used."
+        }
         if let snapshot = store.snapshot(for: provider), let subtitle = snapshot.subtitle {
             return subtitle
         }
@@ -504,9 +558,34 @@ struct SettingsView: View {
     }
 
     private func connectionColor(for provider: AIProvider) -> Color {
+        if testingProviders.contains(provider) { return provider.tint }
+        if dirtyProviders.contains(provider) { return provider.tint }
         if store.snapshot(for: provider) != nil, store.error(for: provider) == nil { return .green }
         if store.error(for: provider) != nil { return .orange }
         return store.isConfigured(provider) ? provider.tint : Color.secondary.opacity(0.4)
+    }
+
+    private var draftClaudeCredentials: ClaudeCredentials {
+        ClaudeCredentials(
+            organizationID: organizationID.trimmingCharacters(in: .whitespacesAndNewlines),
+            sessionKey: claudeSessionKey.trimmingCharacters(in: .whitespacesAndNewlines),
+            oauthAccessToken: nilIfEmpty(claudeOAuthAccessToken),
+            oauthRefreshToken: nilIfEmpty(claudeOAuthRefreshToken),
+            oauthExpiresAt: claudeOAuthExpiresAt,
+            oauthScopes: claudeOAuthScopes,
+            oauthRateLimitTier: claudeOAuthRateLimitTier,
+            oauthSubscriptionType: claudeOAuthSubscriptionType
+        )
+    }
+
+    private var draftOpenAICredentials: OpenAICredentials {
+        OpenAICredentials(
+            accessToken: openAIAccessToken.trimmingCharacters(in: .whitespacesAndNewlines),
+            refreshToken: openAIRefreshToken.trimmingCharacters(in: .whitespacesAndNewlines),
+            idToken: openAIIDToken.trimmingCharacters(in: .whitespacesAndNewlines),
+            accountID: openAIAccountID.trimmingCharacters(in: .whitespacesAndNewlines),
+            lastRefresh: openAILastRefresh
+        )
     }
 
     private var appVersion: String {
@@ -521,92 +600,127 @@ struct SettingsView: View {
     }
 
     private func loadCredentials() {
-        do {
-            let claude = try store.claudeCredentials()
-            organizationID = claude.organizationID
-            claudeSessionKey = claude.sessionKey
-            claudeOAuthAccessToken = claude.oauthAccessToken ?? ""
-            claudeOAuthRefreshToken = claude.oauthRefreshToken ?? ""
-            claudeOAuthExpiresAt = claude.oauthExpiresAt
-            claudeOAuthScopes = claude.oauthScopes ?? []
-            claudeOAuthRateLimitTier = claude.oauthRateLimitTier
-            claudeOAuthSubscriptionType = claude.oauthSubscriptionType
+        didLoadCredentials = false
+        defer { didLoadCredentials = true }
 
-            let openAI = try store.openAICredentials()
-            openAIAccessToken = openAI.accessToken
-            openAIRefreshToken = openAI.refreshToken
-            openAIIDToken = openAI.idToken
-            openAIAccountID = openAI.accountID
-            openAILastRefresh = openAI.lastRefresh
+        do {
+            let credentials = try store.claudeCredentials()
+            applyClaudeCredentials(credentials)
+            savedClaudeCredentials = credentials
         } catch {
-            statuses[.anthropic] = SettingsStatus(message: error.localizedDescription, isError: true)
+            statuses[.anthropic] = SettingsStatus(message: error.localizedDescription, kind: .error)
         }
+
+        do {
+            let credentials = try store.openAICredentials()
+            applyOpenAICredentials(credentials)
+            savedOpenAICredentials = credentials
+        } catch {
+            statuses[.openAI] = SettingsStatus(message: error.localizedDescription, kind: .error)
+        }
+
+        dirtyProviders.removeAll()
     }
 
     private func saveClaudeAndTest() {
-        let credentials = ClaudeCredentials(
-            organizationID: organizationID.trimmingCharacters(in: .whitespacesAndNewlines),
-            sessionKey: claudeSessionKey.trimmingCharacters(in: .whitespacesAndNewlines),
-            oauthAccessToken: nilIfEmpty(claudeOAuthAccessToken),
-            oauthRefreshToken: nilIfEmpty(claudeOAuthRefreshToken),
-            oauthExpiresAt: claudeOAuthExpiresAt,
-            oauthScopes: claudeOAuthScopes,
-            oauthRateLimitTier: claudeOAuthRateLimitTier,
-            oauthSubscriptionType: claudeOAuthSubscriptionType
-        )
+        let credentials = draftClaudeCredentials
         guard credentials.isComplete else {
             statuses[.anthropic] = SettingsStatus(
                 message: "Import Claude Code credentials or complete both browser-session fields.",
-                isError: true
+                kind: .error
             )
             return
         }
 
         do {
             try store.saveClaude(credentials)
-            statuses[.anthropic] = SettingsStatus(message: "Credentials saved. Testing…", isError: false)
+            savedClaudeCredentials = credentials
+            dirtyProviders.remove(.anthropic)
+            testingProviders.insert(.anthropic)
+            statuses[.anthropic] = SettingsStatus(
+                message: "Credentials saved. Testing the connection…",
+                kind: .information
+            )
             Task {
-                await store.refresh(.anthropic)
-                if let error = store.error(for: .anthropic) {
-                    statuses[.anthropic] = SettingsStatus(message: error, isError: true)
+                let succeeded = await store.refresh(.anthropic)
+                testingProviders.remove(.anthropic)
+                if succeeded, store.snapshot(for: .anthropic) != nil {
+                    if let refreshed = try? store.claudeCredentials() {
+                        let draftWasUnchanged = draftClaudeCredentials == credentials
+                        savedClaudeCredentials = refreshed
+                        if draftWasUnchanged {
+                            applyClaudeCredentials(refreshed)
+                            dirtyProviders.remove(.anthropic)
+                        } else {
+                            dirtyProviders.insert(.anthropic)
+                        }
+                    }
+                    statuses[.anthropic] = SettingsStatus(
+                        message: "Claude connected successfully.",
+                        kind: .success
+                    )
+                } else if let error = store.error(for: .anthropic) {
+                    statuses[.anthropic] = SettingsStatus(message: error, kind: .error)
                 } else {
-                    statuses[.anthropic] = SettingsStatus(message: "Claude connected successfully.", isError: false)
+                    statuses[.anthropic] = SettingsStatus(
+                        message: "The connection test did not complete. Try again.",
+                        kind: .error
+                    )
                 }
             }
         } catch {
-            statuses[.anthropic] = SettingsStatus(message: error.localizedDescription, isError: true)
+            statuses[.anthropic] = SettingsStatus(message: error.localizedDescription, kind: .error)
         }
     }
 
     private func saveOpenAIAndTest() {
-        let credentials = OpenAICredentials(
-            accessToken: openAIAccessToken.trimmingCharacters(in: .whitespacesAndNewlines),
-            refreshToken: openAIRefreshToken.trimmingCharacters(in: .whitespacesAndNewlines),
-            idToken: openAIIDToken.trimmingCharacters(in: .whitespacesAndNewlines),
-            accountID: openAIAccountID.trimmingCharacters(in: .whitespacesAndNewlines),
-            lastRefresh: openAILastRefresh
-        )
+        let credentials = draftOpenAICredentials
         guard credentials.isComplete else {
             statuses[.openAI] = SettingsStatus(
                 message: "Import Codex auth.json or enter an OAuth access token.",
-                isError: true
+                kind: .error
             )
             return
         }
 
         do {
             try store.saveOpenAI(credentials)
-            statuses[.openAI] = SettingsStatus(message: "Credentials saved. Testing…", isError: false)
+            savedOpenAICredentials = credentials
+            dirtyProviders.remove(.openAI)
+            testingProviders.insert(.openAI)
+            statuses[.openAI] = SettingsStatus(
+                message: "Credentials saved. Testing the connection…",
+                kind: .information
+            )
             Task {
-                await store.refresh(.openAI)
-                if let error = store.error(for: .openAI) {
-                    statuses[.openAI] = SettingsStatus(message: error, isError: true)
+                let succeeded = await store.refresh(.openAI)
+                testingProviders.remove(.openAI)
+                if succeeded, store.snapshot(for: .openAI) != nil {
+                    if let refreshed = try? store.openAICredentials() {
+                        let draftWasUnchanged = draftOpenAICredentials == credentials
+                        savedOpenAICredentials = refreshed
+                        if draftWasUnchanged {
+                            applyOpenAICredentials(refreshed)
+                            dirtyProviders.remove(.openAI)
+                        } else {
+                            dirtyProviders.insert(.openAI)
+                        }
+                    }
+                    statuses[.openAI] = SettingsStatus(
+                        message: "OpenAI connected successfully.",
+                        kind: .success
+                    )
+                } else if let error = store.error(for: .openAI) {
+                    statuses[.openAI] = SettingsStatus(message: error, kind: .error)
                 } else {
-                    statuses[.openAI] = SettingsStatus(message: "OpenAI connected successfully.", isError: false)
+                    statuses[.openAI] = SettingsStatus(
+                        message: "The connection test did not complete. Try again.",
+                        kind: .error
+                    )
                 }
             }
         } catch {
-            statuses[.openAI] = SettingsStatus(message: error.localizedDescription, isError: true)
+            statuses[.openAI] = SettingsStatus(message: error.localizedDescription, kind: .error)
         }
     }
 
@@ -628,10 +742,10 @@ struct SettingsView: View {
             claudeOAuthSubscriptionType = imported.oauthSubscriptionType
             statuses[.anthropic] = SettingsStatus(
                 message: "Imported Claude Code credentials. Select Save & Test to connect.",
-                isError: false
+                kind: .information
             )
         } catch {
-            statuses[.anthropic] = SettingsStatus(message: error.localizedDescription, isError: true)
+            statuses[.anthropic] = SettingsStatus(message: error.localizedDescription, kind: .error)
         }
     }
 
@@ -652,10 +766,10 @@ struct SettingsView: View {
             openAILastRefresh = credentials.lastRefresh
             statuses[.openAI] = SettingsStatus(
                 message: "Imported Codex credentials. Select Save & Test to connect.",
-                isError: false
+                kind: .information
             )
         } catch {
-            statuses[.openAI] = SettingsStatus(message: error.localizedDescription, isError: true)
+            statuses[.openAI] = SettingsStatus(message: error.localizedDescription, kind: .error)
         }
     }
 
@@ -678,6 +792,37 @@ struct SettingsView: View {
         return panel
     }
 
+    private func applyClaudeCredentials(_ credentials: ClaudeCredentials) {
+        organizationID = credentials.organizationID
+        claudeSessionKey = credentials.sessionKey
+        claudeOAuthAccessToken = credentials.oauthAccessToken ?? ""
+        claudeOAuthRefreshToken = credentials.oauthRefreshToken ?? ""
+        claudeOAuthExpiresAt = credentials.oauthExpiresAt
+        claudeOAuthScopes = credentials.oauthScopes ?? []
+        claudeOAuthRateLimitTier = credentials.oauthRateLimitTier
+        claudeOAuthSubscriptionType = credentials.oauthSubscriptionType
+    }
+
+    private func applyOpenAICredentials(_ credentials: OpenAICredentials) {
+        openAIAccessToken = credentials.accessToken
+        openAIRefreshToken = credentials.refreshToken
+        openAIIDToken = credentials.idToken
+        openAIAccountID = credentials.accountID
+        openAILastRefresh = credentials.lastRefresh
+    }
+
+    private func updateDirtyState(_ provider: AIProvider, isDirty: Bool) {
+        guard didLoadCredentials else { return }
+        if isDirty {
+            dirtyProviders.insert(provider)
+            if statuses[provider]?.kind != .information {
+                statuses.removeValue(forKey: provider)
+            }
+        } else {
+            dirtyProviders.remove(provider)
+        }
+    }
+
     private func disconnectSelectedProvider() {
         guard let provider = providerToDisconnect else { return }
         defer { providerToDisconnect = nil }
@@ -685,24 +830,27 @@ struct SettingsView: View {
             try store.disconnect(provider)
             switch provider {
             case .anthropic:
-                organizationID = ""
-                claudeSessionKey = ""
-                claudeOAuthAccessToken = ""
-                claudeOAuthRefreshToken = ""
-                claudeOAuthExpiresAt = nil
-                claudeOAuthScopes = []
-                claudeOAuthRateLimitTier = nil
-                claudeOAuthSubscriptionType = nil
+                let empty = ClaudeCredentials()
+                applyClaudeCredentials(empty)
+                savedClaudeCredentials = empty
             case .openAI:
-                openAIAccessToken = ""
-                openAIRefreshToken = ""
-                openAIIDToken = ""
-                openAIAccountID = ""
-                openAILastRefresh = nil
+                let empty = OpenAICredentials(
+                    accessToken: "",
+                    refreshToken: "",
+                    idToken: "",
+                    accountID: "",
+                    lastRefresh: nil
+                )
+                applyOpenAICredentials(empty)
+                savedOpenAICredentials = empty
             }
-            statuses[provider] = SettingsStatus(message: "\(provider.displayName) disconnected.", isError: false)
+            dirtyProviders.remove(provider)
+            statuses[provider] = SettingsStatus(
+                message: "\(provider.displayName) disconnected.",
+                kind: .success
+            )
         } catch {
-            statuses[provider] = SettingsStatus(message: error.localizedDescription, isError: true)
+            statuses[provider] = SettingsStatus(message: error.localizedDescription, kind: .error)
         }
     }
 
@@ -737,6 +885,7 @@ private struct SecretInput: View {
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
             .help(isRevealed ? "Hide credential" : "Show credential")
+            .accessibilityLabel(isRevealed ? "Hide \(title)" : "Show \(title)")
         }
     }
 }

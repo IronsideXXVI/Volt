@@ -33,6 +33,9 @@ jobs:
           plutil -lint Volt/Info.plist
           plutil -lint Volt/Volt.entitlements
 
+      - name: Test provider normalization
+        run: swift test -Xswiftc -warnings-as-errors
+
       - name: Resolve Swift packages
         run: |
           xcodebuild -resolvePackageDependencies \

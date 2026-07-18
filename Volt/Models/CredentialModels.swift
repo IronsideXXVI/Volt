@@ -75,11 +75,11 @@ struct ClaudeCredentials: Codable, Equatable, Sendable {
 
         return ClaudeCredentials(
             oauthAccessToken: accessToken,
-            oauthRefreshToken: oauth["refreshToken"] as? String,
+            oauthRefreshToken: (oauth["refreshToken"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
             oauthExpiresAt: expiresAt,
             oauthScopes: oauth["scopes"] as? [String],
-            oauthRateLimitTier: oauth["rateLimitTier"] as? String,
-            oauthSubscriptionType: oauth["subscriptionType"] as? String
+            oauthRateLimitTier: (oauth["rateLimitTier"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+            oauthSubscriptionType: (oauth["subscriptionType"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
         )
     }
 }
@@ -122,7 +122,7 @@ struct OpenAICredentials: Codable, Equatable, Sendable {
             return tokenExpiration.timeIntervalSinceNow < 5 * 60
         }
         guard let lastRefresh else { return true }
-        return Date().timeIntervalSince(lastRefresh) > 7 * 24 * 60 * 60
+        return Date().timeIntervalSince(lastRefresh) > 8 * 24 * 60 * 60
     }
 
     static func imported(from data: Data) throws -> OpenAICredentials {
@@ -132,11 +132,12 @@ struct OpenAICredentials: Codable, Equatable, Sendable {
         let tokens = (root["tokens"] as? [String: Any]) ?? root
 
         func value(_ snakeCase: String, _ camelCase: String) -> String {
-            (tokens[snakeCase] as? String)
+            let raw = (tokens[snakeCase] as? String)
                 ?? (tokens[camelCase] as? String)
                 ?? (root[snakeCase] as? String)
                 ?? (root[camelCase] as? String)
                 ?? ""
+            return raw.trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
         let accessToken = value("access_token", "accessToken")

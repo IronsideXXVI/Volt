@@ -38,6 +38,9 @@ jobs:
           fi
           xcodebuild -version
 
+      - name: Test provider normalization
+        run: swift test -Xswiftc -warnings-as-errors
+
       - name: Determine release version
         run: |
           BASE_VERSION=$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -showBuildSettings \

@@ -90,9 +90,19 @@ struct VoltLogoView: View {
 }
 
 struct VoltSurface<Content: View>: View {
-    var cornerRadius: CGFloat = 13
-    var padding: CGFloat = 14
-    @ViewBuilder let content: Content
+    var cornerRadius: CGFloat
+    var padding: CGFloat
+    private let content: Content
+
+    init(
+        cornerRadius: CGFloat = 13,
+        padding: CGFloat = 14,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.cornerRadius = cornerRadius
+        self.padding = padding
+        self.content = content()
+    }
 
     var body: some View {
         content

@@ -25,6 +25,7 @@ let package = Package(
             ],
             sources: [
                 "Models/CredentialModels.swift",
+                "Models/ProviderUsagePresentation.swift",
                 "Models/UsageModels.swift",
                 "Services/ClaudeUsageService.swift",
                 "Services/OpenAIUsageService.swift",

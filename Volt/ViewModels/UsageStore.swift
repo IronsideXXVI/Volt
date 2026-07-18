@@ -97,7 +97,7 @@ final class UsageStore {
                 }
             }
 
-            snapshots[provider] = snapshot
+            snapshots[provider] = snapshot.curatedForDashboard()
             errors[provider] = nil
             return true
         } catch is CancellationError {

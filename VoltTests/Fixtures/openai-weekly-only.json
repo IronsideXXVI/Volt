@@ -1,0 +1,21 @@
+{
+  "plan_type": "prolite",
+  "email": "fixture@example.invalid",
+  "rate_limit": {
+    "allowed": true,
+    "limit_reached": false,
+    "primary_window": {
+      "used_percent": 43,
+      "limit_window_seconds": 604800,
+      "reset_after_seconds": 3600,
+      "reset_at": 1784500000
+    },
+    "secondary_window": null
+  },
+  "additional_rate_limits": [],
+  "credits": {
+    "has_credits": false,
+    "unlimited": false,
+    "balance": 0
+  }
+}

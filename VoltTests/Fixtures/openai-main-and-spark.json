@@ -1,0 +1,33 @@
+{
+  "plan_type": "prolite",
+  "rate_limit": {
+    "allowed": true,
+    "limit_reached": false,
+    "primary_window": {
+      "used_percent": 43,
+      "limit_window_seconds": 604800,
+      "reset_at": 1784500000
+    }
+  },
+  "additional_rate_limits": [
+    {
+      "limit_name": "GPT-5.3-Codex-Spark",
+      "metered_feature": "codex_bengalfox",
+      "rate_limit": {
+        "allowed": true,
+        "limit_reached": false,
+        "primary_window": {
+          "used_percent": 0,
+          "limit_window_seconds": 604800,
+          "reset_at": 1784600000
+        }
+      }
+    },
+    "malformed entry that must not discard valid limits"
+  ],
+  "credits": {
+    "has_credits": false,
+    "unlimited": false,
+    "balance": null
+  }
+}

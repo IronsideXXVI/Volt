@@ -1,0 +1,72 @@
+{
+  "five_hour": {
+    "utilization": 10,
+    "resets_at": "2026-07-18T03:00:00Z"
+  },
+  "seven_day": {
+    "utilization": 20,
+    "resets_at": "2026-07-24T03:00:00Z"
+  },
+  "seven_day_sonnet": {
+    "utilization": 99,
+    "resets_at": "2026-07-24T03:00:00Z"
+  },
+  "seven_day_routines": {
+    "utilization": 5,
+    "resets_at": "2026-07-24T03:00:00Z"
+  },
+  "seven_day_future_feature": {
+    "utilization": 7,
+    "resets_at": "2026-07-24T03:00:00Z"
+  },
+  "limits": [
+    {
+      "kind": "weekly_scoped",
+      "group": "weekly",
+      "percent": 31,
+      "resets_at": "2026-07-24T03:00:00Z",
+      "scope": {
+        "model": {
+          "id": "claude-sonnet-4-5",
+          "display_name": "Claude Sonnet 4.5"
+        }
+      },
+      "is_active": true
+    },
+    {
+      "kind": "weekly_scoped",
+      "group": "weekly",
+      "percent": 2,
+      "resets_at": "2026-07-24T03:00:00Z",
+      "scope": {
+        "model": {
+          "id": "promotional-fable",
+          "display_name": "Fable"
+        }
+      },
+      "is_active": false
+    },
+    {
+      "kind": "weekly_scoped",
+      "group": "weekly",
+      "percent": 20,
+      "scope": {
+        "model": {
+          "id": "all-models",
+          "display_name": "All models"
+        }
+      }
+    },
+    {
+      "kind": "future_feature",
+      "group": "monthly",
+      "percent": 9,
+      "scope": {
+        "model": {
+          "id": "future-model",
+          "display_name": "Future model"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "amount": 3750,
+  "currency": "USD",
+  "auto_reload_settings": {
+    "threshold_minor_units": 1000,
+    "reload_amount_minor_units": 2500
+  },
+  "pending_invoice_amount_cents": 200
+}

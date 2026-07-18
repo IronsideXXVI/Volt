@@ -4,9 +4,18 @@ import SwiftUI
 enum VoltTheme {
     static let primary = Color(hex: "FF00FF")
     static let alternate = Color(hex: "4C004A")
-    static let track = Color.primary.opacity(0.12)
-    static let hairline = Color.primary.opacity(0.13)
-    static let panel = Color.primary.opacity(0.05)
+    static let windowElapsed = Color(hex: "9898AA")
+
+    static let canvas = Color(nsColor: .windowBackgroundColor)
+    static let sidebar = Color.primary.opacity(0.028)
+    static let surface = Color.primary.opacity(0.045)
+    static let elevatedSurface = Color.primary.opacity(0.065)
+    static let track = Color.primary.opacity(0.105)
+    static let hairline = Color.primary.opacity(0.12)
+    static let strongHairline = Color.primary.opacity(0.18)
+
+    // Retained for views that predate the surface naming.
+    static let panel = surface
 }
 
 extension AIProvider {
@@ -77,5 +86,32 @@ struct VoltLogoView: View {
             .scaledToFit()
             .frame(width: size, height: size)
             .accessibilityLabel("Volt")
+    }
+}
+
+struct VoltSurface<Content: View>: View {
+    var cornerRadius: CGFloat
+    var padding: CGFloat
+    private let content: Content
+
+    init(
+        cornerRadius: CGFloat = 13,
+        padding: CGFloat = 14,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.cornerRadius = cornerRadius
+        self.padding = padding
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .padding(padding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(VoltTheme.surface, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(VoltTheme.hairline, lineWidth: 0.5)
+            }
     }
 }

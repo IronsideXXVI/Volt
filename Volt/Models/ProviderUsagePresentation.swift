@@ -1,0 +1,208 @@
+import Foundation
+
+extension ProviderUsageSnapshot {
+    /// Converts the defensively decoded provider response into Volt's intentional,
+    /// provider-specific dashboard contract. Unknown API buckets remain decoded by the
+    /// services, but they do not automatically become user-facing rows.
+    func curatedForDashboard() -> ProviderUsageSnapshot {
+        switch provider {
+        case .openAI:
+            return curatedOpenAI
+        case .anthropic:
+            return curatedClaude
+        }
+    }
+
+    private var curatedOpenAI: ProviderUsageSnapshot {
+        let planWindows = sections.first(where: { $0.id == "openai-plan-limits" })?.windows
+            ?? windows.filter { $0.sourceIdentifier == "rate_limit" }
+
+        let weekly = planWindows.first(where: { window in
+            Self.isWeekly(window.duration) || window.title.localizedCaseInsensitiveContains("weekly")
+        }).map { window in
+            Self.copy(
+                window,
+                id: "openai-weekly-usage",
+                title: "Weekly usage limit",
+                displayMode: .used
+            )
+        }
+
+        let usageSections: [UsageSection]
+        if let weekly {
+            usageSections = [UsageSection(
+                id: "openai-usage",
+                title: "Usage",
+                windows: [weekly]
+            )]
+        } else {
+            usageSections = []
+        }
+
+        let resetItems = planWindows.compactMap { window -> UsageDetailItem? in
+            guard let reset = window.resetsAt else { return nil }
+            return UsageDetailItem(
+                id: "openai-reset-\(window.id)",
+                title: Self.openAIResetTitle(for: window),
+                value: reset.formatted(.dateTime.month(.abbreviated).day().hour().minute())
+            )
+        }
+        let resetSections = resetItems.isEmpty ? [] : [UsageDetailSection(
+            id: "openai-usage-limit-resets",
+            title: "Usage limit resets",
+            items: resetItems
+        )]
+
+        return ProviderUsageSnapshot(
+            provider: provider,
+            account: account,
+            plan: plan,
+            sections: usageSections,
+            detailSections: resetSections,
+            notices: notices.filter { $0.id == "openai-plan-limit-reached" },
+            updatedAt: updatedAt
+        )
+    }
+
+    private var curatedClaude: ProviderUsageSnapshot {
+        let sourceWindows = windows
+        let session = sourceWindows.first(where: { window in
+            window.id == "claude-session" || window.sourceIdentifier == "five_hour"
+        }).map { window in
+            Self.copy(window, id: "claude-current-session", title: "Current session")
+        }
+
+        let allModels = sourceWindows.first(where: { window in
+            window.id == "claude-weekly-all-models"
+                || window.title.caseInsensitiveCompare("All models") == .orderedSame
+        }).map { window in
+            Self.copy(window, id: "claude-weekly-all-models", title: "All models")
+        }
+
+        let fable = sourceWindows.first(where: { window in
+            window.title.localizedCaseInsensitiveContains("fable")
+                || window.sourceIdentifier?.localizedCaseInsensitiveContains("fable") == true
+        }).map { window in
+            Self.copy(window, id: "claude-weekly-fable", title: "Fable")
+        }
+
+        var usageSections: [UsageSection] = []
+        if let session {
+            usageSections.append(UsageSection(
+                id: "claude-current-session-section",
+                title: "Current session",
+                windows: [session]
+            ))
+        }
+
+        let weekly = [allModels, fable].compactMap { $0 }
+        if !weekly.isEmpty {
+            usageSections.append(UsageSection(
+                id: "claude-weekly-limits",
+                title: "Weekly limits",
+                windows: weekly
+            ))
+        }
+
+        let rawDetails = detailSections.flatMap(\.items)
+        let usageCreditItems = [
+            Self.detailItem(
+                in: rawDetails,
+                id: "claude-extra-enabled",
+                title: "Status"
+            ),
+            Self.detailItem(
+                in: rawDetails,
+                id: "claude-extra-spent",
+                title: "Amount spent"
+            ),
+            Self.detailItem(
+                in: rawDetails,
+                id: "claude-purchases-reset",
+                title: "Resets"
+            ),
+        ].compactMap { $0 }
+
+        let spendLimitItems = [
+            Self.detailItem(
+                in: rawDetails,
+                id: "claude-prepaid-balance",
+                title: "Current balance"
+            ),
+            Self.detailItem(
+                in: rawDetails,
+                id: "claude-auto-reload",
+                title: "Auto-reload"
+            ),
+        ].compactMap { $0 }
+
+        var curatedDetails: [UsageDetailSection] = []
+        if !usageCreditItems.isEmpty {
+            curatedDetails.append(UsageDetailSection(
+                id: "claude-usage-credits",
+                title: "Usage credits",
+                items: usageCreditItems
+            ))
+        }
+        if !spendLimitItems.isEmpty {
+            curatedDetails.append(UsageDetailSection(
+                id: "claude-spend-limit",
+                title: "Spend limit",
+                items: spendLimitItems
+            ))
+        }
+
+        return ProviderUsageSnapshot(
+            provider: provider,
+            account: account,
+            plan: plan,
+            sections: usageSections,
+            detailSections: curatedDetails,
+            notices: notices,
+            updatedAt: updatedAt
+        )
+    }
+
+    private static func copy(
+        _ window: UsageWindow,
+        id: String,
+        title: String,
+        displayMode: UsageMetricDisplayMode? = nil
+    ) -> UsageWindow {
+        UsageWindow(
+            id: id,
+            title: title,
+            usedPercent: window.usedPercent,
+            displayMode: displayMode ?? window.displayMode,
+            resetsAt: window.resetsAt,
+            duration: window.duration,
+            sourceIdentifier: window.sourceIdentifier,
+            detail: window.detail,
+            isAllowed: window.isAllowed,
+            isLimitReached: window.isLimitReached,
+            isActive: window.isActive
+        )
+    }
+
+    private static func detailItem(
+        in items: [UsageDetailItem],
+        id: String,
+        title: String
+    ) -> UsageDetailItem? {
+        guard let item = items.first(where: { $0.id == id }) else { return nil }
+        return UsageDetailItem(id: id, title: title, value: item.value, detail: item.detail)
+    }
+
+    private static func openAIResetTitle(for window: UsageWindow) -> String {
+        if isWeekly(window.duration) { return "Weekly usage limit" }
+        if let duration = window.duration, abs(duration - 5 * 60 * 60) < 60 {
+            return "5-hour usage limit"
+        }
+        return window.title
+    }
+
+    private static func isWeekly(_ duration: TimeInterval?) -> Bool {
+        guard let duration else { return false }
+        return abs(duration - 7 * 24 * 60 * 60) < 60 * 60
+    }
+}

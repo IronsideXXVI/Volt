@@ -4,38 +4,42 @@ import SwiftUI
 struct UsageRowView: View {
     let window: UsageWindow
     let tint: Color
+    var showsTitle = true
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private let windowElapsedColor = Color(hex: "9898AA")
-
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { timeline in
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 9) {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text(window.title)
-                        .font(.system(size: 12.5, weight: .medium))
+                    Text(showsTitle ? window.title : "Quota used")
+                        .font(.system(size: showsTitle ? 12.5 : 10.5, weight: showsTitle ? .semibold : .medium))
+                        .foregroundStyle(showsTitle ? Color.primary : Color.secondary)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
+
                     Spacer(minLength: 8)
+
                     Text(window.percentageDescription)
-                        .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(metricColor)
                         .monospacedDigit()
                         .fixedSize()
                 }
 
-                VStack(spacing: 4) {
+                VStack(spacing: 5) {
                     MetricBar(
                         value: window.barFraction,
                         tint: metricColor,
+                        height: 9,
                         animatesChanges: !reduceMotion
                     )
 
                     if let elapsedFraction = window.windowElapsedFraction(at: timeline.date) {
                         MetricBar(
                             value: elapsedFraction,
-                            tint: windowElapsedColor,
+                            tint: VoltTheme.windowElapsed,
+                            height: 6,
                             animatesChanges: !reduceMotion
                         )
                     }
@@ -51,31 +55,32 @@ struct UsageRowView: View {
     }
 
     private func metadata(now: Date) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 4) {
             if let status = window.statusDescription {
-                HStack(alignment: .firstTextBaseline, spacing: 5) {
-                    Image(systemName: statusSymbol)
-                        .font(.system(size: 9.5, weight: .semibold))
-                    Text(status)
-                        .fontWeight(.medium)
-                }
-                .foregroundStyle(metadataColor)
+                Label(status, systemImage: statusSymbol)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(metadataColor)
             }
 
             if let reset = window.resetsAt {
-                HStack(alignment: .firstTextBaseline, spacing: 5) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Image(systemName: "clock")
-                        .font(.system(size: 9.5, weight: .medium))
+                        .font(.system(size: 9.5, weight: .semibold))
                     Text(resetDescription(reset, now: now))
 
-                    Spacer(minLength: 4)
+                    Spacer(minLength: 5)
 
                     if let elapsed = window.windowElapsedPercentageDescription(at: now) {
-                        Text(elapsed)
-                            .font(.system(size: 10.5, weight: .semibold, design: .rounded))
-                            .foregroundStyle(windowElapsedColor)
-                            .monospacedDigit()
-                            .fixedSize()
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(VoltTheme.windowElapsed)
+                                .frame(width: 5, height: 5)
+                            Text("\(elapsed) elapsed")
+                                .fontWeight(.semibold)
+                                .monospacedDigit()
+                        }
+                        .foregroundStyle(VoltTheme.windowElapsed)
+                        .fixedSize()
                     }
                 }
                 .foregroundStyle(.secondary)
@@ -175,6 +180,7 @@ struct UsageRowView: View {
 private struct MetricBar: View {
     let value: Double
     let tint: Color
+    let height: CGFloat
     let animatesChanges: Bool
 
     private var clampedValue: Double {
@@ -184,20 +190,19 @@ private struct MetricBar: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                RoundedRectangle(cornerRadius: height / 2, style: .continuous)
                     .fill(VoltTheme.track)
 
-                Rectangle()
+                RoundedRectangle(cornerRadius: height / 2, style: .continuous)
                     .fill(tint)
                     .frame(width: geometry.size.width * clampedValue)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                RoundedRectangle(cornerRadius: height / 2, style: .continuous)
                     .strokeBorder(VoltTheme.hairline, lineWidth: 0.5)
             }
         }
-        .frame(height: 8)
+        .frame(height: height)
         .animation(animatesChanges ? .easeOut(duration: 0.28) : nil, value: clampedValue)
         .accessibilityHidden(true)
     }

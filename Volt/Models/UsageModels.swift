@@ -39,6 +39,15 @@ enum UsageMetricDisplayMode: String, Codable, Sendable, Equatable {
     }
 }
 
+enum UsageQuotaState: Sendable, Equatable {
+    case normal
+    case warning
+    case critical
+    case exhausted
+    case unavailable
+    case inactive
+}
+
 struct UsageWindow: Identifiable, Sendable {
     let id: String
     let title: String
@@ -96,12 +105,47 @@ struct UsageWindow: Identifiable, Sendable {
         }
     }
 
+    /// The bar always visualizes quota consumed, regardless of whether the provider labels the
+    /// number as used or remaining. A limit with 10% remaining is therefore 90% full.
     var barFraction: Double {
-        displayPercent / 100
+        clampedUsedPercent / 100
     }
 
     var percentageDescription: String {
-        "\(Int(displayPercent.rounded()))% \(displayMode.label)"
+        "\(Self.formattedPercent(displayPercent)) \(displayMode.label)"
+    }
+
+    var accessibilityDescription: String {
+        "\(Self.formattedPercent(clampedUsedPercent)) used, \(Self.formattedPercent(remainingPercent)) remaining"
+    }
+
+    var quotaState: UsageQuotaState {
+        if isActive == false { return .inactive }
+        if isLimitReached == true || clampedUsedPercent >= 100 { return .exhausted }
+        if isAllowed == false { return .unavailable }
+        if clampedUsedPercent >= 90 { return .critical }
+        if clampedUsedPercent >= 75 { return .warning }
+        return .normal
+    }
+
+    var statusDescription: String? {
+        switch quotaState {
+        case .inactive:
+            return "Inactive"
+        case .unavailable:
+            return "Currently unavailable"
+        case .exhausted:
+            return "Limit reached"
+        case .normal, .warning, .critical:
+            return nil
+        }
+    }
+
+    private static func formattedPercent(_ value: Double) -> String {
+        let clamped = min(max(value.isFinite ? value : 0, 0), 100)
+        if clamped > 0, clamped < 1 { return "<1%" }
+        if clamped > 99, clamped < 100 { return ">99%" }
+        return "\(Int(clamped.rounded()))%"
     }
 }
 
@@ -180,6 +224,7 @@ enum UsageServiceError: LocalizedError, Sendable {
     case invalidCredentials(AIProvider)
     case invalidResponse(AIProvider)
     case server(AIProvider, Int)
+    case rateLimited(AIProvider, Date?)
     case claudeWebChallenge
     case claudeOAuthScope
     case message(String)
@@ -194,6 +239,11 @@ enum UsageServiceError: LocalizedError, Sendable {
             return "Volt could not read the usage response returned by \(provider.displayName)."
         case let .server(provider, status):
             return "\(provider.displayName) returned HTTP \(status). Try again in a moment."
+        case let .rateLimited(provider, retryAfter):
+            if let retryAfter, retryAfter > Date() {
+                return "\(provider.displayName) is temporarily rate-limiting usage checks. Try again \(retryAfter.formatted(.relative(presentation: .named)))."
+            }
+            return "\(provider.displayName) is temporarily rate-limiting usage checks. Wait a few minutes, then refresh."
         case .claudeWebChallenge:
             return "Claude blocked the browser-session request. Import Claude Code credentials in Settings, or update the saved session key."
         case .claudeOAuthScope:

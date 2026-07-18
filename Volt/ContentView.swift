@@ -27,23 +27,24 @@ struct ContentView: View {
             ScrollView {
                 providerContent
                     .frame(maxWidth: .infinity, alignment: .topLeading)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 15)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 16)
             }
-            .frame(height: 400)
+            .frame(height: 420)
 
             Divider()
             footer
         }
-        .frame(width: 380)
+        .frame(width: 400)
         .background(Color(nsColor: .windowBackgroundColor))
+        .tint(VoltTheme.primary)
         .task(id: store.selectedProvider) {
             let provider = store.selectedProvider
             await store.refreshIfNeeded(provider)
 
             while !Task.isCancelled {
                 do {
-                    try await Task.sleep(for: UsageStore.refreshInterval)
+                    try await Task.sleep(for: store.refreshDelay(for: provider))
                 } catch {
                     break
                 }
@@ -69,16 +70,29 @@ struct ContentView: View {
                     .controlSize(.small)
             } else {
                 Circle()
-                    .fill(store.isConfigured(store.selectedProvider)
-                        ? store.selectedProvider.tint
-                        : Color.secondary.opacity(0.35))
+                    .fill(headerStatusColor(for: store.selectedProvider))
                     .frame(width: 7, height: 7)
-                    .accessibilityLabel(store.isConfigured(store.selectedProvider) ? "Connected" : "Not connected")
+                    .accessibilityLabel(headerStatusLabel(for: store.selectedProvider))
             }
         }
         .padding(.horizontal, 14)
         .padding(.top, 12)
         .padding(.bottom, 10)
+    }
+
+    private func headerStatusColor(for provider: AIProvider) -> Color {
+        if store.error(for: provider) != nil { return .orange }
+        if store.snapshot(for: provider) != nil { return .green }
+        if store.isConfigured(provider) { return provider.tint }
+        return Color.secondary.opacity(0.35)
+    }
+
+    private func headerStatusLabel(for provider: AIProvider) -> String {
+        if store.error(for: provider) != nil {
+            return store.snapshot(for: provider) == nil ? "Connection error" : "Showing saved usage"
+        }
+        if store.snapshot(for: provider) != nil { return "Connected" }
+        return store.isConfigured(provider) ? "Credentials saved" : "Not connected"
     }
 
     @ViewBuilder
@@ -100,17 +114,8 @@ struct ContentView: View {
 
     private func snapshotView(_ snapshot: ProviderUsageSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("\(snapshot.provider.displayName) usage")
-                    .font(.system(size: 15, weight: .semibold))
-                if let subtitle = snapshot.subtitle {
-                    Text(subtitle)
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                }
-            }
-            .padding(.bottom, 14)
+            snapshotHeader(snapshot)
+                .padding(.bottom, 15)
 
             if let error = store.error(for: snapshot.provider) {
                 staleDataBanner(error)
@@ -123,10 +128,16 @@ struct ContentView: View {
             }
 
             if snapshot.sections.isEmpty && snapshot.detailSections.isEmpty {
-                Text("No active usage limits were returned for this account.")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 18)
+                VStack(spacing: 8) {
+                    Image(systemName: "chart.bar.xaxis")
+                        .font(.system(size: 20, weight: .medium))
+                    Text("No active usage limits were returned for this account.")
+                        .font(.system(size: 12))
+                        .multilineTextAlignment(.center)
+                }
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 28)
             } else {
                 ForEach(Array(snapshot.sections.enumerated()), id: \.element.id) { index, section in
                     if index > 0 {
@@ -148,7 +159,66 @@ struct ContentView: View {
                 .padding(.bottom, 11)
 
             providerHelpLink(snapshot.provider)
-                .font(.system(size: 10.5))
+                .font(.system(size: 10.5, weight: .medium))
+        }
+    }
+
+    private func snapshotHeader(_ snapshot: ProviderUsageSnapshot) -> some View {
+        HStack(alignment: .center, spacing: 11) {
+            ZStack {
+                Circle()
+                    .fill(snapshot.provider.tint.opacity(0.13))
+                Image(systemName: snapshot.provider.systemImage)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(snapshot.provider.tint)
+            }
+            .frame(width: 34, height: 34)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(snapshot.provider.displayName) usage")
+                    .font(.system(size: 14.5, weight: .semibold))
+
+                if let account = snapshot.account?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !account.isEmpty {
+                    Text(account)
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .textSelection(.enabled)
+                        .help(account)
+                } else {
+                    Text(snapshot.provider.companyName)
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.secondary)
+                }
+
+                Label("Bar fill shows quota used", systemImage: "chart.bar.fill")
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(.tertiary)
+            }
+
+            Spacer(minLength: 8)
+
+            if let plan = snapshot.plan?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !plan.isEmpty {
+                Text(plan)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(snapshot.provider.tint)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(snapshot.provider.tint.opacity(0.10), in: Capsule())
+                    .frame(maxWidth: 135)
+                    .help(plan)
+            }
+        }
+        .padding(11)
+        .background(VoltTheme.panel, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .strokeBorder(VoltTheme.hairline, lineWidth: 0.5)
         }
     }
 
@@ -194,7 +264,9 @@ struct ContentView: View {
                     Text(item.value)
                         .font(.system(size: 11.5, weight: .semibold, design: .rounded))
                         .multilineTextAlignment(.trailing)
+                        .lineLimit(3)
                         .textSelection(.enabled)
+                        .layoutPriority(1)
                 }
             }
         }
@@ -302,12 +374,16 @@ struct ContentView: View {
                 .buttonStyle(.plain)
                 .disabled(store.isLoading(store.selectedProvider) || !store.isConfigured(store.selectedProvider))
                 .help("Refresh usage")
+                .accessibilityLabel("Refresh usage")
+                .keyboardShortcut("r", modifiers: .command)
 
                 SettingsLink {
                     Image(systemName: "gearshape")
                 }
                 .buttonStyle(.plain)
                 .help("Settings")
+                .accessibilityLabel("Open Settings")
+                .keyboardShortcut(",", modifiers: .command)
 
                 Button {
                     NSApplication.shared.terminate(nil)
@@ -316,6 +392,8 @@ struct ContentView: View {
                 }
                 .buttonStyle(.plain)
                 .help("Quit Volt")
+                .accessibilityLabel("Quit Volt")
+                .keyboardShortcut("q", modifiers: .command)
             }
             .font(.system(size: 12))
             .padding(.horizontal, 14)
@@ -327,7 +405,8 @@ struct ContentView: View {
         let seconds = max(Int(now.timeIntervalSince(date)), 0)
         if seconds < 60 { return "Updated just now" }
         if seconds < 3600 { return "Updated \(seconds / 60) min ago" }
-        return "Updated \(seconds / 3600) hr ago"
+        if seconds < 24 * 3600 { return "Updated \(seconds / 3600) hr ago" }
+        return "Updated \(date.formatted(.dateTime.month(.abbreviated).day().hour().minute()))"
     }
 
     private func configurationInstructions(for provider: AIProvider) -> String {

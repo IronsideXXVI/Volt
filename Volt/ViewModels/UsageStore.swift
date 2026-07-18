@@ -5,7 +5,7 @@ import Observation
 @Observable
 final class UsageStore {
     private static let selectedProviderKey = "selectedProvider"
-    static let refreshInterval: Duration = .seconds(10 * 60)
+    private static let refreshIntervalSeconds: TimeInterval = 10 * 60
 
     var selectedProvider: AIProvider {
         didSet {
@@ -16,10 +16,17 @@ final class UsageStore {
     private(set) var snapshots: [AIProvider: ProviderUsageSnapshot] = [:]
     private(set) var errors: [AIProvider: String] = [:]
     private(set) var loadingProviders: Set<AIProvider> = []
+    private(set) var configuredProviders: Set<AIProvider> = []
 
     init() {
         let saved = UserDefaults.standard.string(forKey: Self.selectedProviderKey)
         selectedProvider = AIProvider(rawValue: saved ?? "") ?? .anthropic
+        if (try? CredentialStore.loadClaude())?.isComplete == true {
+            configuredProviders.insert(.anthropic)
+        }
+        if (try? CredentialStore.loadOpenAI())?.isComplete == true {
+            configuredProviders.insert(.openAI)
+        }
     }
 
     func snapshot(for provider: AIProvider) -> ProviderUsageSnapshot? {
@@ -35,35 +42,36 @@ final class UsageStore {
     }
 
     func isConfigured(_ provider: AIProvider) -> Bool {
-        switch provider {
-        case .anthropic:
-            return (try? CredentialStore.loadClaude())?.isComplete == true
-        case .openAI:
-            return (try? CredentialStore.loadOpenAI())?.isComplete == true
-        }
+        configuredProviders.contains(provider)
     }
 
-    func refreshSelected() async {
+    @discardableResult
+    func refreshSelected() async -> Bool {
         await refresh(selectedProvider)
     }
 
-    func refreshIfNeeded(_ provider: AIProvider) async {
+    @discardableResult
+    func refreshIfNeeded(_ provider: AIProvider) async -> Bool {
         if let snapshot = snapshots[provider],
            Date().timeIntervalSince(snapshot.updatedAt) < 60 {
-            return
+            return true
         }
-        await refresh(provider)
+        return await refresh(provider)
     }
 
-    func refresh(_ provider: AIProvider) async {
-        guard !loadingProviders.contains(provider) else { return }
+    @discardableResult
+    func refresh(_ provider: AIProvider) async -> Bool {
+        if loadingProviders.contains(provider) {
+            return await waitForRefreshCompletion(provider)
+        }
         guard isConfigured(provider) else {
             snapshots[provider] = nil
             errors[provider] = nil
-            return
+            return false
         }
 
         loadingProviders.insert(provider)
+        errors[provider] = nil
         defer { loadingProviders.remove(provider) }
 
         do {
@@ -91,13 +99,42 @@ final class UsageStore {
 
             snapshots[provider] = snapshot
             errors[provider] = nil
+            return true
         } catch is CancellationError {
-            return
+            return false
         } catch let error as URLError where error.code == .cancelled {
-            return
+            return false
         } catch {
             errors[provider] = error.localizedDescription
+            return false
         }
+    }
+
+    private func waitForRefreshCompletion(_ provider: AIProvider) async -> Bool {
+        while loadingProviders.contains(provider) {
+            do {
+                try await Task.sleep(for: .milliseconds(100))
+            } catch {
+                return false
+            }
+        }
+        return snapshots[provider] != nil && errors[provider] == nil
+    }
+
+    func refreshDelay(for provider: AIProvider, now: Date = Date()) -> Duration {
+        let regularInterval = Self.refreshIntervalSeconds
+        guard let snapshot = snapshots[provider] else {
+            return .seconds(regularInterval)
+        }
+        let nextReset = snapshot.windows
+            .compactMap(\.resetsAt)
+            .map { $0.timeIntervalSince(now) }
+            .filter { $0 > 0 }
+            .min()
+        guard let nextReset, nextReset < regularInterval else {
+            return .seconds(regularInterval)
+        }
+        return .seconds(max(nextReset + 2, 15))
     }
 
     func claudeCredentials() throws -> ClaudeCredentials {
@@ -117,20 +154,24 @@ final class UsageStore {
     func saveClaude(_ credentials: ClaudeCredentials) throws {
         if credentials.isComplete {
             try CredentialStore.saveClaude(credentials)
+            configuredProviders.insert(.anthropic)
         } else {
             try CredentialStore.deleteClaude()
-            snapshots[.anthropic] = nil
+            configuredProviders.remove(.anthropic)
         }
+        snapshots[.anthropic] = nil
         errors[.anthropic] = nil
     }
 
     func saveOpenAI(_ credentials: OpenAICredentials) throws {
         if credentials.isComplete {
             try CredentialStore.saveOpenAI(credentials)
+            configuredProviders.insert(.openAI)
         } else {
             try CredentialStore.deleteOpenAI()
-            snapshots[.openAI] = nil
+            configuredProviders.remove(.openAI)
         }
+        snapshots[.openAI] = nil
         errors[.openAI] = nil
     }
 
@@ -141,6 +182,7 @@ final class UsageStore {
         case .openAI:
             try CredentialStore.deleteOpenAI()
         }
+        configuredProviders.remove(provider)
         snapshots[provider] = nil
         errors[provider] = nil
     }

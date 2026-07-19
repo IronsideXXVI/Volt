@@ -1,40 +1,37 @@
 import AppKit
 import SwiftUI
 
+/// A small, restrained set of design tokens. The dashboard leans on native
+/// materials, hairline dividers, and provider tints rather than gradients or
+/// glows, so the interface stays quiet and legible in light and dark modes.
 enum VoltTheme {
-    static let primary = Color(hex: "FF00FF")
-    static let alternate = Color(hex: "4C004A")
+    /// Volt's brand accent — a refined magenta used sparingly for app-level
+    /// (non-provider) emphasis such as the wordmark and General settings.
+    static let primary = Color(hex: "D94BC9")
     static let electricBlue = Color(hex: "7B61FF")
-    static let windowElapsed = Color(hex: "9090A4")
 
-    static let canvas = Color(nsColor: .windowBackgroundColor)
-    static let sidebar = Color.primary.opacity(0.035)
-    static let surface = Color(nsColor: .controlBackgroundColor).opacity(0.72)
-    static let elevatedSurface = Color.primary.opacity(0.075)
-    static let track = Color.primary.opacity(0.105)
-    static let hairline = Color.primary.opacity(0.11)
-    static let strongHairline = Color.primary.opacity(0.18)
-    static let softShadow = Color.black.opacity(0.10)
+    /// Neutral gray for the "time elapsed" comparison bar. Reads in both modes.
+    static let windowElapsed = Color(hex: "9A9AA8")
 
-    static let brandGradient = LinearGradient(
-        colors: [primary, electricBlue],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
-
-    static let panel = surface
+    /// Subtle fills and lines, derived from the label color so they adapt to
+    /// the current appearance automatically.
+    static let track = Color.primary.opacity(0.08)
+    static let hairline = Color.primary.opacity(0.09)
+    static let card = Color.primary.opacity(0.035)
+    static let cardHover = Color.primary.opacity(0.06)
 }
 
 extension AIProvider {
     var systemImage: String {
         switch self {
         case .anthropic:
-            return "sparkles"
+            return "sparkle"
         case .openAI:
-            return "brain.head.profile"
+            return "brain"
         }
     }
 
+    /// The single accent used for a provider's rows, bars, and controls.
     var tint: Color {
         switch self {
         case .anthropic:
@@ -42,14 +39,6 @@ extension AIProvider {
         case .openAI:
             return Color(hex: "168BFF")
         }
-    }
-
-    var gradient: LinearGradient {
-        LinearGradient(
-            colors: [tint, tint.opacity(0.62)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
     }
 }
 
@@ -92,7 +81,7 @@ enum VoltAssets {
 }
 
 struct VoltLogoView: View {
-    var size: CGFloat = 30
+    var size: CGFloat = 24
 
     var body: some View {
         Image(nsImage: VoltAssets.logo)
@@ -104,147 +93,64 @@ struct VoltLogoView: View {
     }
 }
 
-struct VoltBackdrop: View {
-    var tint: Color = VoltTheme.primary
-
-    var body: some View {
-        ZStack {
-            VoltTheme.canvas
-
-            Circle()
-                .fill(tint.opacity(0.09))
-                .frame(width: 330, height: 330)
-                .blur(radius: 80)
-                .offset(x: 210, y: -210)
-
-            Circle()
-                .fill(VoltTheme.electricBlue.opacity(0.055))
-                .frame(width: 280, height: 280)
-                .blur(radius: 90)
-                .offset(x: -220, y: 260)
-        }
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-}
-
-struct VoltIconTile: View {
+/// A flat, tinted glyph — an SF Symbol on a low-opacity rounded square.
+/// No gradients, borders, or shadows.
+struct VoltGlyph: View {
     let symbol: String
     let tint: Color
-    var size: CGFloat = 40
-    var symbolSize: CGFloat = 15
+    var size: CGFloat = 28
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [tint.opacity(0.20), tint.opacity(0.07)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-            Image(systemName: symbol)
-                .font(.system(size: symbolSize, weight: .semibold))
-                .foregroundStyle(tint)
-        }
-        .frame(width: size, height: size)
-        .overlay {
-            RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-                .strokeBorder(tint.opacity(0.20), lineWidth: 0.75)
-        }
+        Image(systemName: symbol)
+            .font(.system(size: size * 0.46, weight: .semibold))
+            .foregroundStyle(tint)
+            .frame(width: size, height: size)
+            .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: size * 0.3, style: .continuous))
     }
 }
 
-struct VoltStatusPill: View {
+/// A concise section heading: a title with an optional trailing accessory.
+struct SectionHeader<Accessory: View>: View {
     let title: String
-    let color: Color
-    var symbol: String? = nil
+    var detail: String?
+    @ViewBuilder var accessory: () -> Accessory
 
     var body: some View {
-        HStack(spacing: 5) {
-            if let symbol {
-                Image(systemName: symbol)
-                    .font(.system(size: 8.5, weight: .bold))
-            } else {
-                Circle()
-                    .fill(color)
-                    .frame(width: 6, height: 6)
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                if let detail {
+                    Text(detail)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
             }
-            Text(title)
-                .lineLimit(1)
-        }
-        .font(.system(size: 9.5, weight: .semibold))
-        .foregroundStyle(color)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(color.opacity(0.10), in: Capsule())
-        .overlay {
-            Capsule().strokeBorder(color.opacity(0.16), lineWidth: 0.5)
+            Spacer(minLength: 8)
+            accessory()
         }
     }
 }
 
-struct VoltSurface<Content: View>: View {
-    var cornerRadius: CGFloat
-    var padding: CGFloat
-    var accent: Color?
-    private let content: Content
-
-    init(
-        cornerRadius: CGFloat = 15,
-        padding: CGFloat = 15,
-        accent: Color? = nil,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.cornerRadius = cornerRadius
-        self.padding = padding
-        self.accent = accent
-        self.content = content()
+extension SectionHeader where Accessory == EmptyView {
+    init(_ title: String, detail: String? = nil) {
+        self.init(title: title, detail: detail, accessory: { EmptyView() })
     }
+}
 
-    var body: some View {
-        content
+extension View {
+    /// A quiet card: subtle fill, hairline border, continuous corners.
+    func voltCard(cornerRadius: CGFloat = 12, padding: CGFloat = 14) -> some View {
+        self
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background {
+            .background(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(VoltTheme.surface)
-                    .shadow(color: VoltTheme.softShadow, radius: 8, y: 3)
-            }
+                    .fill(VoltTheme.card)
+            )
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(
-                        accent?.opacity(0.20) ?? VoltTheme.hairline,
-                        lineWidth: accent == nil ? 0.5 : 0.75
-                    )
+                    .strokeBorder(VoltTheme.hairline, lineWidth: 0.5)
             }
-    }
-}
-
-struct VoltSectionLabel: View {
-    let title: String
-    var detail: String? = nil
-    var symbol: String? = nil
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 7) {
-            if let symbol {
-                Image(systemName: symbol)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
-            }
-            Text(title.uppercased())
-                .font(.system(size: 9.5, weight: .bold))
-                .tracking(0.7)
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 8)
-            if let detail {
-                Text(detail)
-                    .font(.system(size: 9.5, weight: .medium))
-                    .foregroundStyle(.tertiary)
-            }
-        }
     }
 }

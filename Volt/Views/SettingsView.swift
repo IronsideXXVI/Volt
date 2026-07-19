@@ -22,8 +22,8 @@ private enum SettingsPane: String, CaseIterable, Identifiable, Equatable {
     var symbol: String {
         switch self {
         case .general: return "slider.horizontal.3"
-        case .claude: return "sparkles"
-        case .openAI: return "brain.head.profile"
+        case .claude: return "sparkle"
+        case .openAI: return "brain"
         case .updates: return "arrow.triangle.2.circlepath"
         }
     }
@@ -92,19 +92,13 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        ZStack {
-            VoltBackdrop(tint: paneTint)
-
-            HStack(spacing: 0) {
-                sidebar
-                Rectangle()
-                    .fill(VoltTheme.hairline)
-                    .frame(width: 0.5)
-                paneContent
-            }
+        HStack(spacing: 0) {
+            sidebar
+            Divider()
+            paneContent
         }
-        .frame(width: 920, height: 640)
-        .tint(VoltTheme.primary)
+        .frame(width: 700, height: 560)
+        .tint(paneTint)
         .onAppear(perform: loadCredentials)
         .onChange(of: draftClaudeCredentials) { _, credentials in
             updateDirtyState(.anthropic, isDirty: credentials != savedClaudeCredentials)
@@ -131,29 +125,18 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: Sidebar
+
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(VoltTheme.brandGradient)
-                        .shadow(color: VoltTheme.primary.opacity(0.20), radius: 9, y: 3)
-                    VoltLogoView(size: 28)
-                }
-                .frame(width: 42, height: 42)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Volt")
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
-                    Text("CONTROL CENTER")
-                        .font(.system(size: 8.5, weight: .bold))
-                        .tracking(0.7)
-                        .foregroundStyle(VoltTheme.primary)
-                }
+            HStack(spacing: 9) {
+                VoltLogoView(size: 20)
+                Text("Volt")
+                    .font(.system(size: 15, weight: .semibold))
             }
-            .padding(.horizontal, 17)
+            .padding(.horizontal, 16)
             .padding(.top, 18)
-            .padding(.bottom, 24)
+            .padding(.bottom, 20)
 
             sidebarGroup("Workspace", panes: [.general])
             sidebarGroup("Connections", panes: [.claude, .openAI])
@@ -161,50 +144,34 @@ struct SettingsView: View {
 
             Spacer()
 
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "lock.shield.fill")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.green)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Private by default")
-                            .font(.system(size: 10, weight: .semibold))
-                        Text("Secrets stay in Keychain")
-                            .font(.system(size: 9))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                Text("VOLT  •  \(appVersion)")
-                    .font(.system(size: 8.5, weight: .semibold, design: .monospaced))
-                    .tracking(0.4)
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Secrets stay in Keychain", systemImage: "lock.shield.fill")
+                    .font(.system(size: 10.5, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Text("Volt \(appVersion)")
+                    .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(.tertiary)
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(VoltTheme.elevatedSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(VoltTheme.hairline, lineWidth: 0.5)
-            }
-            .padding(12)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
         }
-        .frame(width: 224)
+        .frame(width: 190)
         .background(.ultraThinMaterial)
     }
 
     private func sidebarGroup(_ title: String, panes: [SettingsPane]) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 3) {
             Text(title.uppercased())
-                .font(.system(size: 8.5, weight: .bold))
-                .tracking(0.85)
+                .font(.system(size: 9.5, weight: .semibold))
+                .tracking(0.6)
                 .foregroundStyle(.tertiary)
-                .padding(.horizontal, 12)
+                .padding(.horizontal, 18)
+                .padding(.bottom, 3)
 
             ForEach(panes) { pane in
                 sidebarButton(pane)
             }
         }
-        .padding(.horizontal, 8)
         .padding(.bottom, 18)
     }
 
@@ -215,53 +182,45 @@ struct SettingsView: View {
         case .general, .updates: nil
         }
         let isSelected = selectedPane == pane
-
         let tint = provider?.tint ?? (pane == .updates ? Color.green : VoltTheme.primary)
 
         return Button {
-            withAnimation(.easeOut(duration: 0.16)) {
+            withAnimation(.easeOut(duration: 0.14)) {
                 selectedPane = pane
             }
         } label: {
-            HStack(spacing: 10) {
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(isSelected ? tint : Color.clear)
-                    .frame(width: 3, height: 20)
-
+            HStack(spacing: 9) {
                 Image(systemName: pane.symbol)
-                    .font(.system(size: 11.5, weight: .semibold))
-                    .foregroundStyle(isSelected ? tint : Color.secondary)
-                    .frame(width: 22)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(isSelected ? tint : .secondary)
+                    .frame(width: 18)
 
                 Text(pane.title)
-                    .font(.system(size: 12.5, weight: isSelected ? .semibold : .medium))
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? .primary : .secondary)
 
-                Spacer()
+                Spacer(minLength: 4)
 
                 if let provider {
                     Circle()
                         .fill(connectionColor(for: provider))
-                        .frame(width: 7, height: 7)
+                        .frame(width: 6, height: 6)
                         .accessibilityLabel(connectionTitle(for: provider))
                 }
             }
-            .foregroundStyle(isSelected ? Color.primary : Color.secondary)
-            .padding(.horizontal, 7)
-            .frame(height: 40)
+            .padding(.horizontal, 10)
+            .frame(height: 32)
             .background(
-                isSelected ? tint.opacity(0.09) : Color.clear,
-                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                isSelected ? VoltTheme.cardHover : Color.clear,
+                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
             )
-            .overlay {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(tint.opacity(0.16), lineWidth: 0.5)
-                }
-            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .padding(.horizontal, 10)
     }
+
+    // MARK: Pane routing
 
     @ViewBuilder
     private var paneContent: some View {
@@ -294,39 +253,64 @@ struct SettingsView: View {
     }
 
     private var generalPane: some View {
-        settingsPage(
-            title: "General",
-            subtitle: "Dashboard behavior, privacy, and local data handling"
-        ) {
-            heroCard(
-                symbol: "rectangle.3.group.fill",
-                tint: VoltTheme.primary,
-                title: "A focused view of every AI plan",
-                detail: "Volt keeps provider dashboards intentional, compact, and available from the menu bar."
-            )
-
-            VoltSurface {
-                VStack(alignment: .leading, spacing: 15) {
-                    sectionHeading("Dashboard", detail: "Choose the provider Volt shows when it opens.")
-
-                    HStack(spacing: 10) {
-                        ForEach(AIProvider.allCases) { provider in
-                            defaultProviderButton(provider)
-                        }
+        settingsPage(title: "General", subtitle: "Dashboard behavior and local data handling") {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionHeader("Default dashboard", detail: "The provider Volt shows when it opens.")
+                VStack(spacing: 8) {
+                    ForEach(AIProvider.allCases) { provider in
+                        defaultProviderButton(provider)
                     }
                 }
             }
+            .voltCard()
 
-            VoltSurface {
-                VStack(alignment: .leading, spacing: 14) {
-                    sectionHeading("Privacy by design", detail: "Your provider data stays between this Mac and the provider.")
-                    securityRow("Encrypted credential storage", detail: "Secrets are stored in your macOS login Keychain.", symbol: "key.fill")
-                    securityRow("Direct provider requests", detail: "Usage requests go directly to Anthropic and OpenAI.", symbol: "arrow.left.arrow.right")
-                    securityRow("No credential telemetry", detail: "Volt does not proxy, log, or upload credentials.", symbol: "eye.slash.fill")
-                }
+            VStack(alignment: .leading, spacing: 12) {
+                SectionHeader("Privacy", detail: "Your provider data stays between this Mac and the provider.")
+                securityRow("Encrypted credential storage", detail: "Secrets are stored in your macOS login Keychain.", symbol: "key.fill")
+                securityRow("Direct provider requests", detail: "Usage requests go directly to Anthropic and OpenAI.", symbol: "arrow.left.arrow.right")
+                securityRow("No credential telemetry", detail: "Volt does not proxy, log, or upload credentials.", symbol: "eye.slash.fill")
             }
+            .voltCard()
         }
     }
+
+    private var updatesPane: some View {
+        settingsPage(title: "Updates", subtitle: "Stay compatible as provider APIs and usage fields evolve") {
+            VStack(alignment: .leading, spacing: 14) {
+                SectionHeader("Software updates", detail: "Volt checks securely through Sparkle.")
+
+                Toggle(
+                    "Automatically check for updates",
+                    isOn: Binding(
+                        get: { updates.automaticallyChecksForUpdates },
+                        set: { updates.automaticallyChecksForUpdates = $0 }
+                    )
+                )
+                .font(.system(size: 13))
+
+                Divider()
+
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Installed version")
+                            .font(.system(size: 13))
+                        Text(appVersion)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Check for Updates…") {
+                        updates.checkForUpdates()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!updates.canCheckForUpdates)
+                }
+            }
+            .voltCard()
+        }
+    }
+
+    // MARK: Provider pages
 
     private var claudeConnectionContent: some View {
         Group {
@@ -339,7 +323,7 @@ struct SettingsView: View {
                 action: importClaudeCredentials
             )
 
-            VoltSurface {
+            VStack(alignment: .leading, spacing: 0) {
                 DisclosureGroup {
                     VStack(spacing: 10) {
                         SecretInput(title: "Access token", text: $claudeOAuthAccessToken)
@@ -350,15 +334,16 @@ struct SettingsView: View {
                     advancedLabel("Manual OAuth fields", detail: "For advanced setup and troubleshooting")
                 }
             }
+            .voltCard()
 
-            VoltSurface {
+            VStack(alignment: .leading, spacing: 0) {
                 DisclosureGroup {
                     VStack(alignment: .leading, spacing: 10) {
                         TextField("Organization ID", text: $organizationID)
                             .textFieldStyle(.roundedBorder)
                         SecretInput(title: "Session key", text: $claudeSessionKey)
                         Text("Use the organization UUID and `sessionKey` cookie from a signed-in claude.ai session. Browser sessions can expire or be challenged by Cloudflare.")
-                            .font(.system(size: 10.5))
+                            .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -367,6 +352,7 @@ struct SettingsView: View {
                     advancedLabel("Browser session fallback", detail: "Optional access to credits and account details")
                 }
             }
+            .voltCard()
         }
     }
 
@@ -381,7 +367,7 @@ struct SettingsView: View {
                 action: importCodexCredentials
             )
 
-            VoltSurface {
+            VStack(alignment: .leading, spacing: 0) {
                 DisclosureGroup {
                     VStack(spacing: 10) {
                         SecretInput(title: "Access token", text: $openAIAccessToken)
@@ -395,15 +381,16 @@ struct SettingsView: View {
                     advancedLabel("Manual OAuth fields", detail: "For advanced setup and troubleshooting")
                 }
             }
+            .voltCard()
 
             Label(
-                "Codex plan limits use ChatGPT’s authenticated usage endpoint. It is not a public API and may change.",
+                "Codex plan limits use ChatGPT's authenticated usage endpoint. It is not a public API and may change.",
                 systemImage: "info.circle.fill"
             )
-            .font(.system(size: 10.5))
+            .font(.system(size: 11))
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, 3)
+            .padding(.horizontal, 2)
         }
     }
 
@@ -418,63 +405,16 @@ struct SettingsView: View {
             pageHeader(title: title, subtitle: subtitle)
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 13) {
-                    connectionHero(for: provider)
+                VStack(alignment: .leading, spacing: 12) {
+                    connectionStatusCard(for: provider)
                     content()
                     statusBanner(for: provider)
                 }
-                .padding(22)
+                .padding(20)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
 
             actionFooter(for: provider, save: save)
-        }
-    }
-
-    private var updatesPane: some View {
-        settingsPage(
-            title: "Updates",
-            subtitle: "Stay compatible as provider APIs and usage fields evolve"
-        ) {
-            heroCard(
-                symbol: "arrow.triangle.2.circlepath",
-                tint: .green,
-                title: "Keep Volt current",
-                detail: "Usage endpoints can change without notice. Automatic updates keep provider support dependable."
-            )
-
-            VoltSurface {
-                VStack(alignment: .leading, spacing: 16) {
-                    sectionHeading("Software updates", detail: "Volt checks securely through Sparkle.")
-                    Toggle(
-                        "Automatically check for updates",
-                        isOn: Binding(
-                            get: { updates.automaticallyChecksForUpdates },
-                            set: { updates.automaticallyChecksForUpdates = $0 }
-                        )
-                    )
-
-                    Rectangle()
-                        .fill(VoltTheme.hairline)
-                        .frame(height: 0.5)
-
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Installed version")
-                                .font(.system(size: 11.5, weight: .medium))
-                            Text(appVersion)
-                                .font(.system(size: 10.5, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Button("Check for Updates…") {
-                            updates.checkForUpdates()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(!updates.canCheckForUpdates)
-                    }
-                }
-            }
         }
     }
 
@@ -486,125 +426,61 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             pageHeader(title: title, subtitle: subtitle)
             ScrollView {
-                VStack(alignment: .leading, spacing: 13) {
+                VStack(alignment: .leading, spacing: 12) {
                     content()
                 }
-                .padding(22)
+                .padding(20)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
         }
     }
 
     private func pageHeader(title: String, subtitle: String) -> some View {
-        HStack(spacing: 14) {
-            VoltIconTile(
-                symbol: selectedPane.symbol,
-                tint: paneTint,
-                size: 44,
-                symbolSize: 16
-            )
+        VStack(alignment: .leading, spacing: 3) {
+            Text(selectedPane.groupTitle.uppercased())
+                .font(.system(size: 9.5, weight: .semibold))
+                .tracking(0.6)
+                .foregroundStyle(paneTint)
+            Text(title)
+                .font(.system(size: 20, weight: .bold))
+            Text(subtitle)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 20)
+        .padding(.top, 18)
+        .padding(.bottom, 16)
+        .overlay(alignment: .bottom) {
+            Divider()
+        }
+    }
+
+    // MARK: Provider page pieces
+
+    private func connectionStatusCard(for provider: AIProvider) -> some View {
+        HStack(spacing: 12) {
+            VoltGlyph(symbol: provider.systemImage, tint: provider.tint, size: 34)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(selectedPane.groupTitle.uppercased())
-                    .font(.system(size: 8.5, weight: .bold))
-                    .tracking(0.8)
-                    .foregroundStyle(paneTint)
-                Text(title)
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                Text(subtitle)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 23)
-        .padding(.top, 18)
-        .padding(.bottom, 17)
-        .background(.ultraThinMaterial)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(VoltTheme.hairline)
-                .frame(height: 0.5)
-        }
-    }
-
-    private func heroCard(symbol: String, tint: Color, title: String, detail: String) -> some View {
-        ZStack(alignment: .trailing) {
-            RoundedRectangle(cornerRadius: 17, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [tint.opacity(0.15), tint.opacity(0.035)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-
-            Image(systemName: symbol)
-                .font(.system(size: 72, weight: .bold))
-                .foregroundStyle(tint.opacity(0.055))
-                .offset(x: 14, y: 8)
-
-            HStack(spacing: 15) {
-                VoltIconTile(symbol: symbol, tint: tint, size: 52, symbolSize: 20)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                    Text(detail)
-                        .font(.system(size: 10.5, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer()
-            }
-            .padding(17)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .clipShape(RoundedRectangle(cornerRadius: 17, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 17, style: .continuous)
-                .strokeBorder(tint.opacity(0.20), lineWidth: 0.75)
-        }
-        .shadow(color: tint.opacity(0.07), radius: 12, y: 4)
-    }
-
-    private func connectionHero(for provider: AIProvider) -> some View {
-        HStack(spacing: 14) {
-            VoltIconTile(symbol: provider.systemImage, tint: provider.tint, size: 48, symbolSize: 18)
-
-            VStack(alignment: .leading, spacing: 4) {
                 Text(connectionTitle(for: provider))
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .font(.system(size: 13, weight: .semibold))
                 Text(connectionDetail(for: provider))
-                    .font(.system(size: 10.5, weight: .medium))
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Spacer(minLength: 16)
+            Spacer(minLength: 12)
 
-            VoltStatusPill(
+            statusChip(
                 title: store.isConfigured(provider) ? "Configured" : "Setup required",
                 color: connectionColor(for: provider),
                 symbol: store.isConfigured(provider) ? "checkmark" : "plus"
             )
         }
-        .padding(16)
-        .background(
-            LinearGradient(
-                colors: [provider.tint.opacity(0.12), provider.tint.opacity(0.035)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(provider.tint.opacity(0.20), lineWidth: 0.75)
-        }
+        .voltCard()
     }
 
     private func importCard(
@@ -615,53 +491,40 @@ struct SettingsView: View {
         isReady: Bool,
         action: @escaping () -> Void
     ) -> some View {
-        VoltSurface(accent: provider.tint) {
-            HStack(alignment: .top, spacing: 14) {
-                ZStack {
-                    Circle()
-                        .fill(provider.tint.opacity(0.12))
-                    Text("1")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(provider.tint)
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(alignment: .firstTextBaseline) {
+                Label(title, systemImage: "terminal.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                statusChip(title: "Recommended", color: provider.tint, symbol: "star.fill")
+            }
+
+            Text(detail)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 10) {
+                Button(action: action) {
+                    Label(buttonTitle, systemImage: "square.and.arrow.down")
                 }
-                .frame(width: 30, height: 30)
+                .buttonStyle(.borderedProminent)
+                .tint(provider.tint)
 
-                VStack(alignment: .leading, spacing: 11) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Label(title, systemImage: "terminal.fill")
-                            .font(.system(size: 13, weight: .bold))
-                        Spacer()
-                        VoltStatusPill(title: "Recommended", color: provider.tint, symbol: "star.fill")
-                    }
-
-                    Text(detail)
-                        .font(.system(size: 10.5, weight: .medium))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    HStack(spacing: 11) {
-                        Button(action: action) {
-                            Label(buttonTitle, systemImage: "square.and.arrow.down")
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(provider.tint)
-                        .controlSize(.large)
-
-                        if isReady {
-                            VoltStatusPill(title: "Credential ready", color: .green, symbol: "checkmark")
-                        }
-                    }
+                if isReady {
+                    statusChip(title: "Credential ready", color: .green, symbol: "checkmark")
                 }
             }
         }
+        .voltCard()
     }
 
     private func advancedLabel(_ title: String, detail: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(.system(size: 12.5, weight: .semibold))
+                .font(.system(size: 13, weight: .medium))
             Text(detail)
-                .font(.system(size: 10))
+                .font(.system(size: 10.5))
                 .foregroundStyle(.secondary)
         }
     }
@@ -673,33 +536,28 @@ struct SettingsView: View {
             store.selectedProvider = provider
         } label: {
             HStack(spacing: 10) {
-                VoltIconTile(
-                    symbol: provider.systemImage,
-                    tint: provider.tint,
-                    size: 34,
-                    symbolSize: 12
-                )
-                VStack(alignment: .leading, spacing: 2) {
+                VoltGlyph(symbol: provider.systemImage, tint: provider.tint, size: 30)
+                VStack(alignment: .leading, spacing: 1) {
                     Text(provider.displayName)
-                        .font(.system(size: 11.5, weight: .semibold))
+                        .font(.system(size: 12.5, weight: .semibold))
                     Text(provider.companyName)
-                        .font(.system(size: 9.5))
+                        .font(.system(size: 10.5))
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(isSelected ? provider.tint : Color.secondary.opacity(0.45))
+                    .font(.system(size: 14))
+                    .foregroundStyle(isSelected ? provider.tint : Color.secondary.opacity(0.4))
             }
             .padding(10)
             .frame(maxWidth: .infinity)
             .background(
-                isSelected ? provider.tint.opacity(0.08) : Color.primary.opacity(0.025),
-                in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                isSelected ? provider.tint.opacity(0.08) : VoltTheme.card,
+                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .strokeBorder(isSelected ? provider.tint.opacity(0.20) : VoltTheme.hairline, lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(isSelected ? provider.tint.opacity(0.22) : VoltTheme.hairline, lineWidth: 0.5)
             }
             .contentShape(Rectangle())
         }
@@ -707,30 +565,35 @@ struct SettingsView: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
-    private func sectionHeading(_ title: String, detail: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-            Text(detail)
-                .font(.system(size: 10.5, weight: .medium))
-                .foregroundStyle(.secondary)
+    private func securityRow(_ title: String, detail: String, symbol: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: symbol)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.green)
+                .frame(width: 16, height: 16)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 12.5, weight: .medium))
+                Text(detail)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
         }
     }
 
-    private func securityRow(_ title: String, detail: String, symbol: String) -> some View {
-        HStack(alignment: .top, spacing: 11) {
+    private func statusChip(title: String, color: Color, symbol: String) -> some View {
+        HStack(spacing: 4) {
             Image(systemName: symbol)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.green)
-                .frame(width: 18, height: 18)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 11.5, weight: .semibold))
-                Text(detail)
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.secondary)
-            }
+                .font(.system(size: 8.5, weight: .bold))
+            Text(title)
+                .lineLimit(1)
         }
+        .font(.system(size: 10.5, weight: .medium))
+        .foregroundStyle(color)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(color.opacity(0.12), in: Capsule())
     }
 
     @ViewBuilder
@@ -749,16 +612,12 @@ struct SettingsView: View {
             }
 
             Label(status.message, systemImage: symbol)
-                .font(.system(size: 10.5, weight: .medium))
+                .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(color)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(11)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(color.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(color.opacity(0.16), lineWidth: 0.5)
-                }
+                .background(color.opacity(0.1), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
     }
 
@@ -776,35 +635,32 @@ struct SettingsView: View {
 
             if dirtyProviders.contains(provider) {
                 Label("Unsaved changes", systemImage: "circle.fill")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 10.5, weight: .medium))
                     .foregroundStyle(provider.tint)
             }
 
             Button(action: save) {
                 HStack(spacing: 7) {
                     if testingProviders.contains(provider) {
-                        ProgressView()
-                            .controlSize(.small)
+                        ProgressView().controlSize(.small)
                     }
                     Text(testingProviders.contains(provider) ? "Testing…" : "Save & Test")
                 }
-                .frame(minWidth: 82)
+                .frame(minWidth: 78)
             }
             .buttonStyle(.borderedProminent)
             .tint(provider.tint)
-            .controlSize(.large)
             .disabled(store.isLoading(provider) || testingProviders.contains(provider))
         }
-        .padding(.horizontal, 22)
-        .padding(.vertical, 13)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
         .background(.ultraThinMaterial)
         .overlay(alignment: .top) {
-            Rectangle()
-                .fill(VoltTheme.hairline)
-                .frame(height: 0.5)
+            Divider()
         }
-        .shadow(color: Color.black.opacity(0.05), radius: 8, y: -2)
     }
+
+    // MARK: Connection copy helpers
 
     private func connectionTitle(for provider: AIProvider) -> String {
         if testingProviders.contains(provider) || store.isLoading(provider) { return "Testing connection…" }
@@ -835,6 +691,8 @@ struct SettingsView: View {
         if store.error(for: provider) != nil { return .orange }
         return store.isConfigured(provider) ? provider.tint : Color.secondary.opacity(0.4)
     }
+
+    // MARK: Credential state
 
     private var draftClaudeCredentials: ClaudeCredentials {
         ClaudeCredentials(
@@ -1152,7 +1010,7 @@ private struct SecretInput: View {
             } label: {
                 Image(systemName: isRevealed ? "eye.slash" : "eye")
                     .frame(width: 26, height: 26)
-                    .background(VoltTheme.surface, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                    .background(VoltTheme.card, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)

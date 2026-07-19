@@ -1,6 +1,10 @@
 import Foundation
 import SwiftUI
 
+/// A single usage limit. The two stacked bars are the heart of the view: the
+/// top bar is quota consumed, the bar directly beneath it is how much of the
+/// reset window has elapsed. Aligning them makes it obvious at a glance whether
+/// usage is running ahead of or behind the clock.
 struct UsageRowView: View {
     let window: UsageWindow
     let tint: Color
@@ -10,165 +14,106 @@ struct UsageRowView: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { timeline in
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .center, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(showsTitle ? window.title : "Quota consumption")
-                            .font(.system(size: showsTitle ? 12.5 : 10.5, weight: showsTitle ? .semibold : .medium))
-                            .foregroundStyle(showsTitle ? Color.primary : Color.secondary)
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
+            let elapsed = window.windowElapsedFraction(at: timeline.date)
 
-                        if showsTitle {
-                            Text("Provider-reported limit")
-                                .font(.system(size: 8.5, weight: .medium))
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(showsTitle ? window.title : "Quota consumed")
+                        .font(.system(size: 13, weight: showsTitle ? .medium : .regular))
+                        .foregroundStyle(showsTitle ? .primary : .secondary)
+                        .lineLimit(1)
 
                     Spacer(minLength: 8)
 
                     Text(window.percentageDescription)
-                        .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(metricColor)
                         .monospacedDigit()
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(metricColor.opacity(0.09), in: Capsule())
-                        .overlay {
-                            Capsule().strokeBorder(metricColor.opacity(0.15), lineWidth: 0.5)
-                        }
                         .fixedSize()
                 }
 
-                VStack(spacing: 7) {
-                    metricLine(
-                        label: "USE",
-                        value: window.barFraction,
-                        tint: metricColor,
-                        height: 9
-                    )
-
-                    if let elapsedFraction = window.windowElapsedFraction(at: timeline.date) {
-                        metricLine(
-                            label: "TIME",
-                            value: elapsedFraction,
-                            tint: VoltTheme.windowElapsed,
-                            height: 6
-                        )
+                VStack(spacing: 4) {
+                    UsageBar(fraction: window.barFraction, fill: metricColor)
+                    if let elapsed {
+                        UsageBar(fraction: elapsed, fill: VoltTheme.windowElapsed)
                     }
                 }
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: window.barFraction)
 
-                metadata(now: timeline.date)
+                metadata(elapsed: elapsed, now: timeline.date)
             }
-            .opacity(window.quotaState == .inactive ? 0.68 : 1)
+            .opacity(window.quotaState == .inactive ? 0.6 : 1)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(window.title)
             .accessibilityValue(accessibilityValue(now: timeline.date))
         }
     }
 
-    private func metricLine(label: String, value: Double, tint: Color, height: CGFloat) -> some View {
-        HStack(spacing: 8) {
-            Text(label)
-                .font(.system(size: 7.5, weight: .heavy, design: .rounded))
-                .tracking(0.4)
-                .foregroundStyle(tint)
-                .frame(width: 28, alignment: .leading)
-
-            MetricBar(
-                value: value,
-                tint: tint,
-                height: height,
-                animatesChanges: !reduceMotion
-            )
-        }
-    }
-
-    private func metadata(now: Date) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+    @ViewBuilder
+    private func metadata(elapsed: Double?, now: Date) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
             if let status = window.statusDescription {
                 Label(status, systemImage: statusSymbol)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(metadataColor)
             }
 
-            if let reset = window.resetsAt {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Image(systemName: "clock")
-                        .font(.system(size: 9.5, weight: .semibold))
-                    Text(resetDescription(reset, now: now))
-
-                    Spacer(minLength: 5)
-
-                    if let elapsed = window.windowElapsedPercentageDescription(at: now) {
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(VoltTheme.windowElapsed)
-                                .frame(width: 5, height: 5)
-                            Text("\(elapsed) elapsed")
-                                .fontWeight(.semibold)
-                                .monospacedDigit()
-                        }
-                        .foregroundStyle(VoltTheme.windowElapsed)
-                        .fixedSize()
-                    }
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                if let reset = window.resetsAt {
+                    Label(resetDescription(reset, now: now), systemImage: "clock")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
                 }
-                .foregroundStyle(.secondary)
-            } else if window.statusDescription == nil, let detail = window.detail {
-                Text(detail)
-                    .foregroundStyle(metadataColor)
+
+                Spacer(minLength: 6)
+
+                if let elapsed {
+                    Text("\(percentString(elapsed)) elapsed")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(VoltTheme.windowElapsed)
+                        .monospacedDigit()
+                        .fixedSize()
+                }
             }
 
             if let detail = window.detail,
-               detail.caseInsensitiveCompare(window.statusDescription ?? "") != .orderedSame,
-               window.resetsAt != nil || window.statusDescription != nil {
+               detail.caseInsensitiveCompare(window.statusDescription ?? "") != .orderedSame {
                 Text(detail)
-                    .fontWeight(.medium)
+                    .font(.system(size: 11))
                     .foregroundStyle(metadataColor)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .font(.system(size: 10.5))
     }
 
     private var metricColor: Color {
         switch window.quotaState {
-        case .normal:
-            return tint
-        case .warning:
-            return .orange
-        case .critical, .exhausted:
-            return .red
-        case .unavailable:
-            return .orange
-        case .inactive:
-            return .secondary
+        case .normal: return tint
+        case .warning, .unavailable: return .orange
+        case .critical, .exhausted: return .red
+        case .inactive: return .secondary
         }
     }
 
     private var metadataColor: Color {
         switch window.quotaState {
-        case .critical, .exhausted:
-            return .red
-        case .warning, .unavailable:
-            return .orange
-        case .normal, .inactive:
-            return .secondary
+        case .critical, .exhausted: return .red
+        case .warning, .unavailable: return .orange
+        case .normal, .inactive: return .secondary
         }
     }
 
     private var statusSymbol: String {
         switch window.quotaState {
-        case .inactive:
-            return "pause.circle.fill"
-        case .unavailable:
-            return "exclamationmark.circle.fill"
-        case .exhausted:
-            return "xmark.circle.fill"
-        case .normal, .warning, .critical:
-            return "info.circle.fill"
+        case .inactive: return "pause.circle.fill"
+        case .unavailable: return "exclamationmark.circle.fill"
+        case .exhausted: return "xmark.circle.fill"
+        case .normal, .warning, .critical: return "info.circle.fill"
         }
+    }
+
+    private func percentString(_ fraction: Double) -> String {
+        "\(Int((min(max(fraction, 0), 1) * 100).rounded()))%"
     }
 
     private func accessibilityValue(now: Date) -> String {
@@ -208,40 +153,27 @@ struct UsageRowView: View {
     }
 }
 
-private struct MetricBar: View {
-    let value: Double
-    let tint: Color
-    let height: CGFloat
-    let animatesChanges: Bool
+/// A single rounded progress bar over a neutral track.
+private struct UsageBar: View {
+    let fraction: Double
+    let fill: Color
+    var height: CGFloat = 8
 
-    private var clampedValue: Double {
-        min(max(value.isFinite ? value : 0, 0), 1)
+    private var clamped: Double {
+        min(max(fraction.isFinite ? fraction : 0, 0), 1)
     }
 
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: height / 2, style: .continuous)
+                Capsule(style: .continuous)
                     .fill(VoltTheme.track)
-
-                RoundedRectangle(cornerRadius: height / 2, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [tint, tint.opacity(0.68)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .frame(width: geometry.size.width * clampedValue)
-                    .shadow(color: tint.opacity(0.20), radius: 3)
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: height / 2, style: .continuous)
-                    .strokeBorder(VoltTheme.hairline, lineWidth: 0.5)
+                Capsule(style: .continuous)
+                    .fill(fill)
+                    .frame(width: geometry.size.width * clamped)
             }
         }
         .frame(height: height)
-        .animation(animatesChanges ? .easeOut(duration: 0.28) : nil, value: clampedValue)
         .accessibilityHidden(true)
     }
 }

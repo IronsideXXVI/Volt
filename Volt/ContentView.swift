@@ -67,29 +67,10 @@ struct ContentView: View {
                 .font(.system(size: 15, weight: .semibold))
 
             Spacer(minLength: 8)
-
-            connectionIndicator(for: store.selectedProvider)
         }
         .padding(.horizontal, 14)
         .padding(.top, 13)
         .padding(.bottom, 11)
-    }
-
-    @ViewBuilder
-    private func connectionIndicator(for provider: AIProvider) -> some View {
-        if store.isLoading(provider) {
-            HStack(spacing: 5) {
-                ProgressView().controlSize(.mini)
-                Text("Syncing")
-            }
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(.secondary)
-        } else {
-            Text(headerStatusLabel(for: provider))
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
-                .accessibilityLabel(headerStatusLabel(for: provider))
-        }
     }
 
     // MARK: Provider switcher
@@ -103,17 +84,11 @@ struct ContentView: View {
                         selection.wrappedValue = provider
                     }
                 } label: {
-                    HStack(spacing: 7) {
-                        Image(systemName: provider.systemImage)
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(isSelected ? provider.tint : .secondary)
-                        Text(provider.displayName)
-                            .font(.system(size: 12.5, weight: isSelected ? .semibold : .medium))
-                            .foregroundStyle(isSelected ? .primary : .secondary)
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.horizontal, 11)
-                    .frame(maxWidth: .infinity, minHeight: 32)
+                    Text(provider.displayName)
+                        .font(.system(size: 12.5, weight: isSelected ? .semibold : .medium))
+                        .foregroundStyle(isSelected ? .primary : .secondary)
+                        .padding(.horizontal, 11)
+                        .frame(maxWidth: .infinity, minHeight: 32)
                     .background {
                         if isSelected {
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -197,7 +172,7 @@ struct ContentView: View {
             } else {
                 ForEach(Array(snapshot.sections.enumerated()), id: \.element.id) { index, section in
                     if index > 0 { Divider() }
-                    usageSection(section, tint: snapshot.provider.tint)
+                    usageSection(section)
                 }
 
                 ForEach(snapshot.detailSections) { section in
@@ -205,16 +180,12 @@ struct ContentView: View {
                     detailSection(section)
                 }
             }
-
-            Divider()
-            providerHelpLink(snapshot.provider)
-                .font(.system(size: 11, weight: .medium))
         }
     }
 
     private var legend: some View {
         HStack(spacing: 10) {
-            legendItem(color: store.selectedProvider.tint, title: "Used")
+            legendItem(color: VoltTheme.primary, title: "Used")
             legendItem(color: VoltTheme.windowElapsed, title: "Time")
         }
     }
@@ -228,7 +199,7 @@ struct ContentView: View {
         .foregroundStyle(.secondary)
     }
 
-    private func usageSection(_ section: UsageSection, tint: Color) -> some View {
+    private func usageSection(_ section: UsageSection) -> some View {
         let isSelfTitled = section.windows.count == 1 && section.title == section.windows.first?.title
 
         return VStack(alignment: .leading, spacing: 12) {
@@ -245,7 +216,7 @@ struct ContentView: View {
             }
 
             ForEach(section.windows) { window in
-                UsageRowView(window: window, tint: tint, showsTitle: true)
+                UsageRowView(window: window, showsTitle: true)
             }
         }
     }
@@ -460,14 +431,6 @@ struct ContentView: View {
         return value
     }
 
-    private func headerStatusLabel(for provider: AIProvider) -> String {
-        if store.error(for: provider) != nil {
-            return store.snapshot(for: provider) == nil ? "Needs attention" : "Saved data"
-        }
-        if store.snapshot(for: provider) != nil { return "Connected" }
-        return store.isConfigured(provider) ? "Ready" : "Not connected"
-    }
-
     private func updatedDescription(_ date: Date, now: Date) -> String {
         let seconds = max(Int(now.timeIntervalSince(date)), 0)
         if seconds < 60 { return "Updated just now" }
@@ -485,21 +448,6 @@ struct ContentView: View {
         }
     }
 
-    private func providerHelpLink(_ provider: AIProvider) -> some View {
-        let url: URL
-        let title: String
-        switch provider {
-        case .anthropic:
-            url = URL(string: "https://support.claude.com/en/articles/11647753-understanding-usage-and-length-limits")!
-            title = "Learn about Claude usage limits"
-        case .openAI:
-            url = URL(string: "https://chatgpt.com/codex/settings/usage")!
-            title = "Open the Codex usage dashboard"
-        }
-        return Link(destination: url) {
-            Label(title, systemImage: "arrow.up.right")
-        }
-    }
 }
 
 private struct ContentHeightKey: PreferenceKey {

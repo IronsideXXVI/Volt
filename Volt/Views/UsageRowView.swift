@@ -7,7 +7,6 @@ import SwiftUI
 /// usage is running ahead of or behind the clock.
 struct UsageRowView: View {
     let window: UsageWindow
-    let tint: Color
     var showsTitle = true
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -88,7 +87,7 @@ struct UsageRowView: View {
 
     private var metricColor: Color {
         switch window.quotaState {
-        case .normal: return tint
+        case .normal: return VoltTheme.primary
         case .warning, .unavailable: return .orange
         case .critical, .exhausted: return .red
         case .inactive: return .secondary

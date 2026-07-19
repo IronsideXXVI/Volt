@@ -171,7 +171,23 @@ struct ContentView: View {
                     detailSection(section)
                 }
             }
+
+            if snapshot.provider == .anthropic {
+                Divider()
+                Link("Learn more about usage limits",
+                     destination: URL(string: "https://support.claude.com/en/articles/11647753-understanding-usage-and-length-limits")!)
+                    .font(.system(size: 11, weight: .medium))
+                    .tint(VoltTheme.primary)
+            }
         }
+    }
+
+    /// Renders inline Markdown (links, emphasis) for subtitles and footnotes.
+    private func markdown(_ string: String) -> AttributedString {
+        (try? AttributedString(
+            markdown: string,
+            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        )) ?? AttributedString(string)
     }
 
     private func usageSection(_ section: UsageSection) -> some View {
@@ -183,9 +199,11 @@ struct ContentView: View {
                     Text(section.title)
                         .font(.system(size: 13, weight: .semibold))
                     if let subtitle = section.subtitle {
-                        Text(subtitle)
+                        Text(markdown(subtitle))
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .tint(VoltTheme.primary)
                     }
                 }
             }
@@ -228,6 +246,15 @@ struct ContentView: View {
                             .textSelection(.enabled)
                     }
                 }
+            }
+
+            if let footnote = section.footnote {
+                Text(markdown(footnote))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .tint(VoltTheme.primary)
+                    .padding(.top, 1)
             }
         }
     }

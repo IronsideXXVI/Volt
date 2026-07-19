@@ -10,8 +10,9 @@ enum VoltTheme {
     static let primary = Color(hex: "D94BC9")
     static let electricBlue = Color(hex: "7B61FF")
 
-    /// Neutral gray for the "time elapsed" comparison bar. Reads in both modes.
-    static let windowElapsed = Color(hex: "9A9AA8")
+    /// Neutral gray for the "time elapsed" comparison bar. Adaptive so it reads
+    /// darker in light mode while staying visible against a dark background.
+    static let windowElapsed = Color.primary.opacity(0.55)
 
     /// Subtle fills and lines, derived from the label color so they adapt to
     /// the current appearance automatically.

@@ -70,7 +70,7 @@ final class ProviderUsagePresentationTests: XCTestCase {
 
         let resets = try XCTUnwrap(dashboard.detailSections.first)
         XCTAssertEqual(resets.title, "Usage limit resets")
-        XCTAssertEqual(resets.items.map(\.title), ["No usage limit resets available at this time"])
+        XCTAssertEqual(resets.items.map(\.title), ["No usage limit resets available at this time."])
         XCTAssertEqual(resets.items.map(\.value), [""])
         XCTAssertEqual(dashboard.notices.map(\.id), ["openai-plan-limit-reached"])
         XCTAssertFalse(dashboard.sections.contains(where: { $0.title.contains("feature") }))
@@ -114,7 +114,7 @@ final class ProviderUsagePresentationTests: XCTestCase {
         let resets = try XCTUnwrap(dashboard.detailSections.first(where: { $0.title == "Usage limit resets" }))
         XCTAssertEqual(resets.items.map(\.title), ["5 credits", "10 credits"])
         XCTAssertEqual(resets.items.map(\.value), ["Expires Jul 31, 2026", "Expires Aug 7, 2026"])
-        XCTAssertFalse(resets.items.contains(where: { $0.title == "No usage limit resets available at this time" }))
+        XCTAssertFalse(resets.items.contains(where: { $0.title == "No usage limit resets available at this time." }))
     }
 
     func testClaudeDashboardKeepsCurrentSessionAllModelsAndFableOnly() throws {

@@ -201,6 +201,16 @@ struct UsageDetailSection: Identifiable, Sendable {
     let id: String
     let title: String
     let items: [UsageDetailItem]
+    /// Optional trailing note rendered beneath the items. Supports Markdown
+    /// links (e.g. "… [Learn more](https://…)").
+    let footnote: String?
+
+    init(id: String, title: String, items: [UsageDetailItem], footnote: String? = nil) {
+        self.id = id
+        self.title = title
+        self.items = items
+        self.footnote = footnote
+    }
 }
 
 struct UsageNotice: Identifiable, Sendable {

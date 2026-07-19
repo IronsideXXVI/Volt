@@ -33,6 +33,7 @@ extension ProviderUsageSnapshot {
             usageSections = [UsageSection(
                 id: "openai-usage",
                 title: "Usage",
+                subtitle: "Usage is shared across Codex, Work, Workspace Agents, and ChatGPT for Excel. It doesn’t include Chat conversations.",
                 windows: [weekly]
             )]
         } else {
@@ -47,7 +48,7 @@ extension ProviderUsageSnapshot {
         let resetSectionItems = resetCreditItems.isEmpty
             ? [UsageDetailItem(
                 id: "openai-no-reset-credits",
-                title: "No usage limit resets available at this time",
+                title: "No usage limit resets available at this time.",
                 value: ""
               )]
             : resetCreditItems
@@ -145,7 +146,8 @@ extension ProviderUsageSnapshot {
             curatedDetails.append(UsageDetailSection(
                 id: "claude-usage-credits",
                 title: "Usage credits",
-                items: usageCreditItems
+                items: usageCreditItems,
+                footnote: "Turn on usage credits to keep using Claude if you hit a limit. [Learn more](https://support.claude.com/en/articles/11647753-understanding-usage-and-length-limits)"
             ))
         }
         if !spendLimitItems.isEmpty {

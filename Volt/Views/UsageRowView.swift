@@ -70,7 +70,7 @@ struct UsageRowView: View {
 
                 if let elapsed {
                     Text("\(percentString(elapsed)) elapsed")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.primary)
                         .monospacedDigit()
                         .fixedSize()

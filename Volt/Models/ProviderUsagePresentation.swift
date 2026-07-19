@@ -147,7 +147,7 @@ extension ProviderUsageSnapshot {
                 id: "claude-usage-credits",
                 title: "Usage credits",
                 items: usageCreditItems,
-                footnote: "Turn on usage credits to keep using Claude if you hit a limit. [Learn more](https://support.claude.com/en/articles/11647753-understanding-usage-and-length-limits)"
+                subtitle: "Turn on usage credits to keep using Claude if you hit a limit. [Learn more](https://support.claude.com/en/articles/11647753-understanding-usage-and-length-limits)"
             ))
         }
         if !spendLimitItems.isEmpty {

@@ -128,7 +128,12 @@ struct ContentView: View {
     // MARK: Snapshot
 
     private func snapshotView(_ snapshot: ProviderUsageSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        let boostNotices = snapshot.notices.filter { $0.id.hasPrefix("claude-boost-") }
+        let otherNotices = snapshot.notices.filter { !$0.id.hasPrefix("claude-boost-") }
+        let isClaude = snapshot.provider == .anthropic
+        let hasWeeklySection = snapshot.sections.contains { $0.id == "claude-weekly-limits" }
+
+        return VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(snapshot.provider.displayName) plan usage limits")
                     .font(.system(size: 15, weight: .semibold))
@@ -154,8 +159,15 @@ struct ContentView: View {
                 banner(error, color: .orange, symbol: "exclamationmark.triangle.fill", prefix: "Showing the last update. ")
             }
 
-            ForEach(snapshot.notices) { notice in
+            ForEach(otherNotices) { notice in
                 noticeView(notice)
+            }
+
+            // When there's no weekly-limits section to attach them to, still
+            // surface the Claude boost banner and learn-more link.
+            if isClaude && !hasWeeklySection {
+                ForEach(boostNotices) { noticeView($0) }
+                learnMoreLink
             }
 
             if snapshot.sections.isEmpty && snapshot.detailSections.isEmpty {
@@ -163,7 +175,11 @@ struct ContentView: View {
             } else {
                 ForEach(Array(snapshot.sections.enumerated()), id: \.element.id) { index, section in
                     if index > 0 { Divider() }
-                    usageSection(section)
+                    if isClaude && section.id == "claude-weekly-limits" {
+                        usageSection(section, boostNotices: boostNotices, showLearnMore: true)
+                    } else {
+                        usageSection(section)
+                    }
                 }
 
                 ForEach(snapshot.detailSections) { section in
@@ -171,26 +187,58 @@ struct ContentView: View {
                     detailSection(section)
                 }
             }
-
-            if snapshot.provider == .anthropic {
-                Divider()
-                Link("Learn more about usage limits",
-                     destination: URL(string: "https://support.claude.com/en/articles/11647753-understanding-usage-and-length-limits")!)
-                    .font(.system(size: 11, weight: .medium))
-                    .tint(VoltTheme.primary)
-            }
         }
     }
 
-    /// Renders inline Markdown (links, emphasis) for subtitles and footnotes.
-    private func markdown(_ string: String) -> AttributedString {
-        (try? AttributedString(
+    /// Renders inline Markdown. Links are tinted with the Volt accent and
+    /// underlined. `base` colors the whole string; `lead` colors the API's
+    /// strongly-emphasized run (e.g. a banner's first sentence) without bolding
+    /// it. When `base` is nil, the surrounding `foregroundStyle` applies.
+    private func styledMarkdown(
+        _ string: String,
+        size: CGFloat = 11,
+        weight: Font.Weight = .medium,
+        base: Color? = nil,
+        lead: Color? = nil
+    ) -> AttributedString {
+        var attributed = (try? AttributedString(
             markdown: string,
             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
         )) ?? AttributedString(string)
+
+        attributed.font = .system(size: size, weight: weight)
+        if let base {
+            attributed.foregroundColor = base
+        }
+        if let lead {
+            let leadRanges = attributed.runs
+                .filter { $0.inlinePresentationIntent?.contains(.stronglyEmphasized) == true }
+                .map(\.range)
+            for range in leadRanges {
+                attributed[range].foregroundColor = lead
+            }
+        }
+        let linkRanges = attributed.runs.filter { $0.link != nil }.map(\.range)
+        for range in linkRanges {
+            attributed[range].underlineStyle = .single
+            attributed[range].foregroundColor = VoltTheme.primary
+        }
+        return attributed
     }
 
-    private func usageSection(_ section: UsageSection) -> some View {
+    /// The standalone "Learn more about usage limits" link (Claude).
+    private var learnMoreLink: some View {
+        Text(styledMarkdown(
+            "[Learn more about usage limits](https://support.claude.com/en/articles/11647753-understanding-usage-and-length-limits)"
+        ))
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func usageSection(
+        _ section: UsageSection,
+        boostNotices: [UsageNotice] = [],
+        showLearnMore: Bool = false
+    ) -> some View {
         let isSelfTitled = section.windows.count == 1 && section.title == section.windows.first?.title
 
         return VStack(alignment: .leading, spacing: 12) {
@@ -199,13 +247,16 @@ struct ContentView: View {
                     Text(section.title)
                         .font(.system(size: 13, weight: .semibold))
                     if let subtitle = section.subtitle {
-                        Text(markdown(subtitle))
-                            .font(.system(size: 11))
+                        Text(styledMarkdown(subtitle))
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
-                            .tint(VoltTheme.primary)
                     }
                 }
+            }
+
+            ForEach(boostNotices) { noticeView($0) }
+            if showLearnMore {
+                learnMoreLink
             }
 
             ForEach(section.windows) { window in
@@ -216,8 +267,15 @@ struct ContentView: View {
 
     private func detailSection(_ section: UsageDetailSection) -> some View {
         VStack(alignment: .leading, spacing: 9) {
-            Text(section.title)
-                .font(.system(size: 13, weight: .semibold))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(section.title)
+                    .font(.system(size: 13, weight: .semibold))
+                if let subtitle = section.subtitle {
+                    Text(styledMarkdown(subtitle))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
 
             ForEach(section.items) { item in
                 if item.value.isEmpty {
@@ -246,15 +304,6 @@ struct ContentView: View {
                             .textSelection(.enabled)
                     }
                 }
-            }
-
-            if let footnote = section.footnote {
-                Text(markdown(footnote))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .tint(VoltTheme.primary)
-                    .padding(.top, 1)
             }
         }
     }
@@ -286,10 +335,11 @@ struct ContentView: View {
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(accent)
                 .padding(.top, 1)
-            Text(markdown(notice.message))
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(isInfo ? .primary : accent)
-                .tint(VoltTheme.primary)
+            Text(styledMarkdown(
+                notice.message,
+                base: isInfo ? .secondary : accent,
+                lead: isInfo ? .primary : accent
+            ))
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }

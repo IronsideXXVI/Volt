@@ -278,9 +278,31 @@ struct ContentView: View {
     // MARK: Banners & notices
 
     private func noticeView(_ notice: UsageNotice) -> some View {
-        let color: Color = notice.kind == .error ? .red : (notice.kind == .warning ? .orange : .secondary)
-        let symbol = notice.kind == .information ? "info.circle.fill" : "exclamationmark.triangle.fill"
-        return banner(notice.message, color: color, symbol: symbol)
+        let isInfo = notice.kind == .information
+        let accent: Color = notice.kind == .error ? .red : (notice.kind == .warning ? .orange : .secondary)
+        let symbol = isInfo ? "info.circle.fill" : "exclamationmark.triangle.fill"
+        return HStack(alignment: .top, spacing: 8) {
+            Image(systemName: symbol)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(accent)
+                .padding(.top, 1)
+            Text(markdown(notice.message))
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(isInfo ? .primary : accent)
+                .tint(VoltTheme.primary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(isInfo ? VoltTheme.card : accent.opacity(0.09),
+                    in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay {
+            if isInfo {
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .strokeBorder(VoltTheme.hairline, lineWidth: 0.5)
+            }
+        }
     }
 
     private func banner(_ message: String, color: Color, symbol: String, prefix: String = "") -> some View {

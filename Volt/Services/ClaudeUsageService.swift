@@ -688,12 +688,15 @@ enum ClaudeUsageService {
 
         var accountInfo: ClaudeAccountInfo?
         var auxiliary = ClaudeAuxiliaryUsage.empty
+        var boostNotices: [UsageNotice] = []
         if credentials.hasWebCredentials {
             let webCredentials = credentials
             async let account = fetchOrganizationInfo(webCredentials)
             async let extras = fetchAuxiliaryUsage(webCredentials)
+            async let boosts = fetchBoostNotices(webCredentials)
             accountInfo = await account
             auxiliary = await extras
+            boostNotices = await boosts
         }
 
         let oauthPlan = ClaudeUsageNormalizer.planDisplayName(
@@ -707,18 +710,22 @@ enum ClaudeUsageService {
             auxiliary: auxiliary
         )
 
+        var addedNotices = boostNotices
         if !usedOAuth, credentials.hasOAuthCredentials, oauthFailure != nil {
+            addedNotices.append(UsageNotice(
+                id: "claude-oauth-fallback",
+                kind: .information,
+                message: "Using the saved browser session because Claude OAuth was unavailable."
+            ))
+        }
+        if !addedNotices.isEmpty {
             snapshot = ProviderUsageSnapshot(
                 provider: snapshot.provider,
                 account: snapshot.account,
                 plan: snapshot.plan,
                 sections: snapshot.sections,
                 detailSections: snapshot.detailSections,
-                notices: snapshot.notices + [UsageNotice(
-                    id: "claude-oauth-fallback",
-                    kind: .information,
-                    message: "Using the saved browser session because Claude OAuth was unavailable."
-                )],
+                notices: addedNotices + snapshot.notices,
                 updatedAt: snapshot.updatedAt
             )
         }
@@ -910,6 +917,77 @@ enum ClaudeUsageService {
             bundlesData: bundles,
             routineData: routine
         )
+    }
+
+    /// Fetches claude.ai's org bootstrap payload and extracts any active
+    /// usage-limit promotion/boost banner. The banner is delivered as a
+    /// GrowthBook feature whose value is a locale → Markdown map; we surface
+    /// the English string when it looks like a usage banner (Markdown link +
+    /// a limit/boost keyword), so new promotions appear automatically without
+    /// hardcoding a feature id.
+    private static func fetchBoostNotices(_ credentials: ClaudeCredentials) async -> [UsageNotice] {
+        guard let organizationID = normalizedOrganizationID(credentials.organizationID),
+              var components = URLComponents(
+                  string: "https://claude.ai/edge-api/bootstrap/\(organizationID)/app_start"
+              )
+        else {
+            return []
+        }
+        components.queryItems = [
+            URLQueryItem(name: "statsig_hashing_algorithm", value: "djb2"),
+            URLQueryItem(name: "growthbook_format", value: "sdk"),
+            URLQueryItem(name: "include_system_prompts", value: "false"),
+        ]
+        guard let url = components.url,
+              let data = await optionalWebData(url: url, credentials: credentials),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else {
+            return []
+        }
+        return boostNotices(from: root)
+    }
+
+    private static func boostNotices(from root: [String: Any]) -> [UsageNotice] {
+        guard let growthbook = root["org_growthbook"] as? [String: Any],
+              let features = growthbook["features"] as? [String: Any]
+        else {
+            return []
+        }
+
+        var notices: [UsageNotice] = []
+        var seen = Set<String>()
+        for (featureID, raw) in features {
+            guard let feature = raw as? [String: Any] else { continue }
+
+            // Prefer a forced rule value (what this org actually gets); fall
+            // back to the default value.
+            var localized = feature["defaultValue"] as? [String: Any]
+            if let rules = feature["rules"] as? [[String: Any]] {
+                for rule in rules {
+                    if let forced = rule["force"] as? [String: Any] {
+                        localized = forced
+                        break
+                    }
+                }
+            }
+
+            guard let localized,
+                  let message = (localized["en-US"] as? String) ?? (localized["en"] as? String),
+                  looksLikeUsageBanner(message)
+            else { continue }
+
+            let cleaned = message.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !cleaned.isEmpty, seen.insert(cleaned).inserted else { continue }
+            notices.append(UsageNotice(id: "claude-boost-\(featureID)", kind: .information, message: cleaned))
+        }
+        return notices
+    }
+
+    private static func looksLikeUsageBanner(_ text: String) -> Bool {
+        let lower = text.lowercased()
+        let hasLink = lower.contains("](http")
+        let hasKeyword = ["limit", "boost", "promotion", "usage", "higher"].contains { lower.contains($0) }
+        return hasLink && hasKeyword
     }
 
     private static func optionalWebData(url: URL, credentials: ClaudeCredentials) async -> Data? {

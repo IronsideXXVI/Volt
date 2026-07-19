@@ -458,14 +458,32 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh api \
-            --method POST \
-            "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
-            -f tag_name="$TAG" \
-            -f target_commitish="$GITHUB_SHA" \
-            > "$RUNNER_TEMP/release-notes.json"
-          jq -r '.body // ""' "$RUNNER_TEMP/release-notes.json" \
-            > "$RUNNER_TEMP/release-notes.md"
+          # Build human-readable notes from commit descriptions between the
+          # previous release tag and this commit, so the update dialog shows a
+          # real changelog of what changed rather than a bare link.
+          git fetch --tags --force origin >/dev/null 2>&1 || true
+          PREV_TAG=$(git tag --list 'v*' --sort=-v:refname | grep -vx "$TAG" | head -n1)
+          if [ -n "$PREV_TAG" ]; then RANGE="${PREV_TAG}..HEAD"; else RANGE="HEAD"; fi
+
+          NOTES="$RUNNER_TEMP/release-notes.md"
+          : > "$NOTES"
+          ANY=0
+          for sha in $(git log "$RANGE" --no-merges --reverse --format='%H'); do
+            BODY="$(git show -s --format='%b' "$sha")"
+            if [ -n "$(printf '%s' "$BODY" | tr -d '[:space:]')" ]; then
+              printf '%s\n\n' "$BODY" >> "$NOTES"
+            else
+              printf -- '- %s\n' "$(git show -s --format='%s' "$sha")" >> "$NOTES"
+            fi
+            ANY=1
+          done
+          if [ "$ANY" -eq 0 ]; then
+            printf 'Maintenance and reliability improvements.\n' >> "$NOTES"
+          fi
+          if [ -n "$PREV_TAG" ]; then
+            printf '\n**Full commit history:** [%s to %s](https://github.com/%s/compare/%s...%s)\n' \
+              "$PREV_TAG" "$TAG" "$GITHUB_REPOSITORY" "$PREV_TAG" "$TAG" >> "$NOTES"
+          fi
 
           jq -n \
             --rawfile text "$RUNNER_TEMP/release-notes.md" \

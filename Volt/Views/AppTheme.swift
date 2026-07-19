@@ -31,14 +31,10 @@ extension AIProvider {
         }
     }
 
-    /// The single accent used for a provider's rows, bars, and controls.
+    /// Volt uses a single brand accent everywhere rather than per-provider
+    /// colors, so both providers resolve to the same magenta tint.
     var tint: Color {
-        switch self {
-        case .anthropic:
-            return Color(hex: "E97545")
-        case .openAI:
-            return Color(hex: "168BFF")
-        }
+        VoltTheme.primary
     }
 }
 

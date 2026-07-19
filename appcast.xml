@@ -6,6 +6,15 @@
     <description>Volt release updates</description>
     <language>en</language>
     <item>
+      <title>Volt 0.1.7</title>
+      <pubDate>Sun, 19 Jul 2026 22:51:49 +0000</pubDate>
+      <sparkle:version>7</sparkle:version>
+      <sparkle:shortVersionString>0.1.7</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0.0</sparkle:minimumSystemVersion>
+      <sparkle:releaseNotesLink>https://ironsidexxvi.github.io/Volt/releases/0.1.7.html</sparkle:releaseNotesLink>
+      <enclosure url="https://github.com/IronsideXXVI/Volt/releases/download/v0.1.7/Volt-0.1.7.dmg" length="5024023" type="application/octet-stream" sparkle:edSignature="VGccPZmGgpxIrlo/Rr0MrSwuCAgblYFkly7w1NmW1TcBvjLb6rFMHs3xepezaAixKIGwJT0x7mIoP0aeyA3ODg==" />
+    </item>
+    <item>
       <title>Volt 0.1.6</title>
       <pubDate>Sun, 19 Jul 2026 22:21:16 +0000</pubDate>
       <sparkle:version>6</sparkle:version>

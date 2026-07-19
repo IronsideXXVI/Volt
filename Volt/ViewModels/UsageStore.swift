@@ -50,12 +50,14 @@ final class UsageStore {
     }
 
     /// Fetches every configured provider once. Called when the menu opens so
-    /// both tabs show fresh data without fetching again on tab switch.
+    /// both tabs show fresh data without fetching again on tab switch. The
+    /// currently selected provider is fetched first so the visible tab loads
+    /// as soon as possible.
     func refreshOnOpen() async {
-        await withTaskGroup(of: Void.self) { group in
-            for provider in AIProvider.allCases where isConfigured(provider) {
-                group.addTask { await self.refresh(provider) }
-            }
+        var providers = [selectedProvider]
+        providers.append(contentsOf: AIProvider.allCases.filter { $0 != selectedProvider })
+        for provider in providers where isConfigured(provider) {
+            await refresh(provider)
         }
     }
 

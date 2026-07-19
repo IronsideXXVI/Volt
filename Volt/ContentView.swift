@@ -5,7 +5,6 @@ struct ContentView: View {
     @Environment(UsageStore.self) private var store
 
     @State private var contentHeight: CGFloat = 0
-    @State private var isMenuOpen = false
 
     private let width: CGFloat = 360
     private let maxContentHeight: CGFloat = 520
@@ -43,14 +42,13 @@ struct ContentView: View {
         }
         .frame(width: width)
         .tint(store.selectedProvider.tint)
-        .onAppear { isMenuOpen = true }
-        .onDisappear { isMenuOpen = false }
-        // Fetch only when the menu opens. Switching provider tabs does not
-        // trigger a fetch, and there is no background polling; the refresh
-        // button is the only other way to fetch.
-        .task(id: isMenuOpen) {
-            guard isMenuOpen else { return }
-            await store.refreshOnOpen()
+        // Fetch only when the menu opens. An unstructured Task is used (rather
+        // than .task(id:)) so the fetch runs to completion and is not cancelled
+        // by the view re-renders that happen while the popover is open.
+        // Switching provider tabs does not fetch, and there is no background
+        // polling; the refresh button is the only other trigger.
+        .onAppear {
+            Task { await store.refreshOnOpen() }
         }
     }
 

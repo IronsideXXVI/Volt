@@ -39,18 +39,22 @@ extension ProviderUsageSnapshot {
             usageSections = []
         }
 
-        let resetItems = planWindows.compactMap { window -> UsageDetailItem? in
-            guard let reset = window.resetsAt else { return nil }
-            return UsageDetailItem(
-                id: "openai-reset-\(window.id)",
-                title: Self.openAIResetTitle(for: window),
-                value: reset.formatted(.dateTime.month(.abbreviated).day().hour().minute())
-            )
-        }
-        let resetSections = resetItems.isEmpty ? [] : [UsageDetailSection(
+        // Rather than the next reset time, surface any reset credits available to
+        // use (parsed by the service from `rate_limit_reset_credits`) with their
+        // expiry, or an explicit "none" message when there are none.
+        let resetCreditItems = detailSections
+            .first(where: { $0.id == "openai-reset-credits" })?.items ?? []
+        let resetSectionItems = resetCreditItems.isEmpty
+            ? [UsageDetailItem(
+                id: "openai-no-reset-credits",
+                title: "No usage limit resets available at this time",
+                value: ""
+              )]
+            : resetCreditItems
+        let resetSections = [UsageDetailSection(
             id: "openai-usage-limit-resets",
             title: "Usage limit resets",
-            items: resetItems
+            items: resetSectionItems
         )]
 
         return ProviderUsageSnapshot(
@@ -114,7 +118,7 @@ extension ProviderUsageSnapshot {
             Self.detailItem(
                 in: rawDetails,
                 id: "claude-extra-spent",
-                title: "Amount spent"
+                title: "Spent"
             ),
             Self.detailItem(
                 in: rawDetails,
@@ -191,14 +195,6 @@ extension ProviderUsageSnapshot {
     ) -> UsageDetailItem? {
         guard let item = items.first(where: { $0.id == id }) else { return nil }
         return UsageDetailItem(id: id, title: title, value: item.value, detail: item.detail)
-    }
-
-    private static func openAIResetTitle(for window: UsageWindow) -> String {
-        if isWeekly(window.duration) { return "Weekly usage limit" }
-        if let duration = window.duration, abs(duration - 5 * 60 * 60) < 60 {
-            return "5-hour usage limit"
-        }
-        return window.title
     }
 
     private static func isWeekly(_ duration: TimeInterval?) -> Bool {

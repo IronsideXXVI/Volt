@@ -85,16 +85,10 @@ struct ContentView: View {
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(.secondary)
         } else {
-            HStack(spacing: 5) {
-                Circle()
-                    .fill(headerStatusColor(for: provider))
-                    .frame(width: 6, height: 6)
-                Text(headerStatusLabel(for: provider))
-            }
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(.secondary)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(headerStatusLabel(for: provider))
+            Text(headerStatusLabel(for: provider))
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+                .accessibilityLabel(headerStatusLabel(for: provider))
         }
     }
 
@@ -117,9 +111,6 @@ struct ContentView: View {
                             .font(.system(size: 12.5, weight: isSelected ? .semibold : .medium))
                             .foregroundStyle(isSelected ? .primary : .secondary)
                         Spacer(minLength: 0)
-                        Circle()
-                            .fill(headerStatusColor(for: provider))
-                            .frame(width: 6, height: 6)
                     }
                     .padding(.horizontal, 11)
                     .frame(maxWidth: .infinity, minHeight: 32)
@@ -169,14 +160,21 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Plan usage limits")
+                    Text("\(snapshot.provider.displayName) plan usage limits")
                         .font(.system(size: 15, weight: .semibold))
-                    if let subtitle = snapshot.subtitle {
-                        Text(subtitle)
+                    if let account = trimmed(snapshot.account) {
+                        Text(account)
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .truncationMode(.middle)
+                            .textSelection(.enabled)
+                    }
+                    if let plan = trimmed(snapshot.plan) {
+                        Text(plan)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                             .textSelection(.enabled)
                     }
                 }
@@ -258,23 +256,31 @@ struct ContentView: View {
                 .font(.system(size: 13, weight: .semibold))
 
             ForEach(section.items) { item in
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(item.title)
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                        if let detail = item.detail {
-                            Text(detail)
-                                .font(.system(size: 10.5))
-                                .foregroundStyle(.tertiary)
+                if item.value.isEmpty {
+                    Text(item.title)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(item.title)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                            if let detail = item.detail {
+                                Text(detail)
+                                    .font(.system(size: 10.5))
+                                    .foregroundStyle(.tertiary)
+                            }
                         }
+                        Spacer(minLength: 8)
+                        Text(item.value)
+                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                            .multilineTextAlignment(.trailing)
+                            .lineLimit(2)
+                            .textSelection(.enabled)
                     }
-                    Spacer(minLength: 8)
-                    Text(item.value)
-                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                        .multilineTextAlignment(.trailing)
-                        .lineLimit(2)
-                        .textSelection(.enabled)
                 }
             }
         }
@@ -392,10 +398,7 @@ struct ContentView: View {
     private var footer: some View {
         TimelineView(.periodic(from: .now, by: 30)) { timeline in
             HStack(spacing: 8) {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(headerStatusColor(for: store.selectedProvider))
-                        .frame(width: 6, height: 6)
+                Group {
                     if let updatedAt = store.snapshot(for: store.selectedProvider)?.updatedAt {
                         Text(updatedDescription(updatedAt, now: timeline.date))
                     } else {
@@ -450,11 +453,11 @@ struct ContentView: View {
 
     // MARK: Status helpers
 
-    private func headerStatusColor(for provider: AIProvider) -> Color {
-        if store.error(for: provider) != nil { return .orange }
-        if store.snapshot(for: provider) != nil { return .green }
-        if store.isConfigured(provider) { return provider.tint }
-        return Color.secondary.opacity(0.35)
+    private func trimmed(_ value: String?) -> String? {
+        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
+            return nil
+        }
+        return value
     }
 
     private func headerStatusLabel(for provider: AIProvider) -> String {

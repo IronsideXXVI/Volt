@@ -453,7 +453,10 @@ enum ClaudeUsageNormalizer {
                 value: enabled ? "On" : "Off"
             ))
         }
-        if let spent = flexibleDouble(extra?["used_credits"]) {
+        // Always surface spend when the extra-usage block exists, defaulting to zero
+        // when the feature is off, so the dashboard consistently shows a Spent row.
+        if extra?["is_enabled"] != nil || extra?["used_credits"] != nil {
+            let spent = flexibleDouble(extra?["used_credits"]) ?? 0
             items.append(UsageDetailItem(
                 id: "claude-extra-spent",
                 title: "Spent",

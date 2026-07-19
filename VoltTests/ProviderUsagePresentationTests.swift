@@ -70,10 +70,51 @@ final class ProviderUsagePresentationTests: XCTestCase {
 
         let resets = try XCTUnwrap(dashboard.detailSections.first)
         XCTAssertEqual(resets.title, "Usage limit resets")
-        XCTAssertEqual(resets.items.map(\.title), ["5-hour usage limit", "Weekly usage limit"])
+        XCTAssertEqual(resets.items.map(\.title), ["No usage limit resets available at this time"])
+        XCTAssertEqual(resets.items.map(\.value), [""])
         XCTAssertEqual(dashboard.notices.map(\.id), ["openai-plan-limit-reached"])
         XCTAssertFalse(dashboard.sections.contains(where: { $0.title.contains("feature") }))
         XCTAssertFalse(dashboard.detailSections.contains(where: { $0.title == "Credits" }))
+    }
+
+    func testOpenAIDashboardSurfacesResetCreditsWhenPresent() throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let raw = ProviderUsageSnapshot(
+            provider: .openAI,
+            account: "fixture@example.invalid",
+            plan: "Pro 5x",
+            sections: [
+                UsageSection(
+                    id: "openai-plan-limits",
+                    title: "Plan usage limits",
+                    windows: [UsageWindow(
+                        id: "openai-plan-weekly",
+                        title: "Weekly limit",
+                        usedPercent: 20,
+                        displayMode: .remaining,
+                        resetsAt: now.addingTimeInterval(86_400),
+                        duration: 7 * 24 * 60 * 60
+                    )]
+                ),
+            ],
+            detailSections: [UsageDetailSection(
+                id: "openai-reset-credits",
+                title: "Usage limit resets",
+                items: [
+                    UsageDetailItem(id: "openai-reset-credit-0", title: "5 credits", value: "Expires Jul 31, 2026"),
+                    UsageDetailItem(id: "openai-reset-credit-1", title: "10 credits", value: "Expires Aug 7, 2026"),
+                ]
+            )],
+            notices: [],
+            updatedAt: now
+        )
+
+        let dashboard = raw.curatedForDashboard()
+
+        let resets = try XCTUnwrap(dashboard.detailSections.first(where: { $0.title == "Usage limit resets" }))
+        XCTAssertEqual(resets.items.map(\.title), ["5 credits", "10 credits"])
+        XCTAssertEqual(resets.items.map(\.value), ["Expires Jul 31, 2026", "Expires Aug 7, 2026"])
+        XCTAssertFalse(resets.items.contains(where: { $0.title == "No usage limit resets available at this time" }))
     }
 
     func testClaudeDashboardKeepsCurrentSessionAllModelsAndFableOnly() throws {
@@ -158,7 +199,7 @@ final class ProviderUsagePresentationTests: XCTestCase {
         XCTAssertFalse(dashboard.windows.contains(where: { $0.title.contains("Sonnet") || $0.title == "Cowork" }))
 
         XCTAssertEqual(dashboard.detailSections.map(\.title), ["Usage credits", "Spend limit"])
-        XCTAssertEqual(dashboard.detailSections[0].items.map(\.title), ["Status", "Amount spent", "Resets"])
+        XCTAssertEqual(dashboard.detailSections[0].items.map(\.title), ["Status", "Spent", "Resets"])
         XCTAssertEqual(dashboard.detailSections[0].items.map(\.value), ["On", "$12.50", "Aug 1"])
         XCTAssertEqual(dashboard.detailSections[1].items.map(\.title), ["Current balance", "Auto-reload"])
         XCTAssertEqual(dashboard.detailSections[1].items.map(\.value), ["$37.50", "On"])

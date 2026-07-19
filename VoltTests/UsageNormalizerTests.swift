@@ -239,7 +239,8 @@ final class UsageNormalizerTests: XCTestCase {
         XCTAssertEqual(routines.duration, 24 * 60 * 60)
 
         let extra = try XCTUnwrap(snapshot.detailSections.first(where: { $0.id == "claude-extra-usage" }))
-        XCTAssertEqual(extra.items.map(\.value), ["Off"])
+        XCTAssertEqual(extra.items.map(\.title), ["Status", "Spent"])
+        XCTAssertEqual(extra.items.map(\.value), ["Off", "$0.00"])
     }
 
     func testClaudeAuxiliaryEndpointsNormalizeIntoDetailRows() throws {

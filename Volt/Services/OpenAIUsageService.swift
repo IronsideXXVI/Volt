@@ -529,15 +529,12 @@ enum OpenAIUsageNormalizer {
             detailSections.append(UsageDetailSection(id: "openai-credits", title: "Credits", items: items))
         }
 
-        if let resetCredits = payload.rateLimitResetCredits?.compactDescription {
+        let resetCreditItems = parseResetCredits(payload.rateLimitResetCredits)
+        if !resetCreditItems.isEmpty {
             detailSections.append(UsageDetailSection(
                 id: "openai-reset-credits",
-                title: "Rate-limit resets",
-                items: [UsageDetailItem(
-                    id: "openai-reset-credit-summary",
-                    title: "Available",
-                    value: resetCredits
-                )]
+                title: "Usage limit resets",
+                items: resetCreditItems
             ))
         }
 
@@ -760,6 +757,124 @@ enum OpenAIUsageNormalizer {
             return nil
         }
         return value
+    }
+
+    // MARK: Reset credits
+
+    /// Best-effort parse of the `rate_limit_reset_credits` payload into one row per
+    /// available credit, showing the amount and its expiry. The shape is not
+    /// contractually documented, so we defensively probe common key names.
+    private static func parseResetCredits(_ value: JSONValue?) -> [UsageDetailItem] {
+        guard let value else { return [] }
+
+        let entries: [JSONValue]
+        switch value {
+        case let .array(array):
+            entries = array
+        case let .object(object):
+            if let nested = ["credits", "items", "resets", "data", "balances", "reset_credits"]
+                .lazy.compactMap({ object[$0] }).first,
+               case let .array(array) = nested {
+                entries = array
+            } else {
+                entries = [value]
+            }
+        default:
+            entries = [value]
+        }
+
+        return entries.enumerated().compactMap { index, entry in
+            resetCreditItem(entry, index: index)
+        }
+    }
+
+    private static func resetCreditItem(_ value: JSONValue, index: Int) -> UsageDetailItem? {
+        switch value {
+        case let .object(object):
+            let amount = firstNumber(object, keys: [
+                "credits", "amount", "value", "count", "balance",
+                "remaining", "granted", "granted_credits", "reset_credits",
+            ])
+            let label = firstString(object, keys: ["label", "name", "description", "type", "title"])
+            let expiry = firstDate(object, keys: [
+                "expires_at", "expiry", "exp", "expires", "expiration",
+                "expire_at", "valid_until", "reset_at", "resets_at",
+            ])
+            guard amount != nil || label != nil || expiry != nil else { return nil }
+            let title = label ?? amount.map(creditLabel) ?? "Reset credit \(index + 1)"
+            let detail = expiry.map { "Expires \(formatExpiry($0))" } ?? "No expiration"
+            return UsageDetailItem(id: "openai-reset-credit-\(index)", title: title, value: detail)
+        case let .number(number):
+            return UsageDetailItem(id: "openai-reset-credit-\(index)", title: creditLabel(number), value: "")
+        case let .string(string):
+            guard let trimmed = nonEmpty(string) else { return nil }
+            return UsageDetailItem(id: "openai-reset-credit-\(index)", title: trimmed, value: "")
+        default:
+            return nil
+        }
+    }
+
+    private static func firstNumber(_ object: [String: JSONValue], keys: [String]) -> Double? {
+        for key in keys {
+            switch object[key] {
+            case let .number(value):
+                return value
+            case let .string(value):
+                if let number = Double(value.trimmingCharacters(in: .whitespacesAndNewlines)) { return number }
+            default:
+                continue
+            }
+        }
+        return nil
+    }
+
+    private static func firstString(_ object: [String: JSONValue], keys: [String]) -> String? {
+        for key in keys {
+            if case let .string(value)? = object[key], let trimmed = nonEmpty(value) {
+                return trimmed
+            }
+        }
+        return nil
+    }
+
+    private static func firstDate(_ object: [String: JSONValue], keys: [String]) -> Date? {
+        for key in keys {
+            switch object[key] {
+            case let .number(value):
+                if let date = dateFromEpoch(value) { return date }
+            case let .string(value):
+                if let date = dateFromString(value) { return date }
+            default:
+                continue
+            }
+        }
+        return nil
+    }
+
+    private static func dateFromEpoch(_ value: Double) -> Date? {
+        guard value > 0 else { return nil }
+        // Values large enough to be milliseconds since 1970 are scaled down.
+        let seconds = value > 1_000_000_000_000 ? value / 1000 : value
+        return Date(timeIntervalSince1970: seconds)
+    }
+
+    private static func dateFromString(_ value: String) -> Date? {
+        guard let trimmed = nonEmpty(value) else { return nil }
+        if let seconds = Double(trimmed) { return dateFromEpoch(seconds) }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = iso.date(from: trimmed) { return date }
+        iso.formatOptions = [.withInternetDateTime]
+        return iso.date(from: trimmed)
+    }
+
+    private static func creditLabel(_ amount: Double) -> String {
+        let number = formattedWholeNumber(amount)
+        return amount == 1 ? "\(number) credit" : "\(number) credits"
+    }
+
+    private static func formatExpiry(_ date: Date) -> String {
+        date.formatted(.dateTime.month(.abbreviated).day().year())
     }
 
     private static func slug(_ value: String) -> String {

@@ -280,7 +280,7 @@ struct ContentView: View {
             ForEach(section.items) { item in
                 if item.value.isEmpty {
                     Text(item.title)
-                        .font(.system(size: 12))
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -288,17 +288,17 @@ struct ContentView: View {
                     HStack(alignment: .firstTextBaseline, spacing: 12) {
                         VStack(alignment: .leading, spacing: 1) {
                             Text(item.title)
-                                .font(.system(size: 12))
+                                .font(.system(size: 11))
                                 .foregroundStyle(.secondary)
                             if let detail = item.detail {
                                 Text(detail)
-                                    .font(.system(size: 10.5))
+                                    .font(.system(size: 11))
                                     .foregroundStyle(.tertiary)
                             }
                         }
                         Spacer(minLength: 8)
                         Text(item.value)
-                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
                             .multilineTextAlignment(.trailing)
                             .lineLimit(2)
                             .textSelection(.enabled)
@@ -387,7 +387,7 @@ struct ContentView: View {
                 Text("Connect \(provider.displayName)")
                     .font(.system(size: 15, weight: .semibold))
                 Text(configurationInstructions(for: provider))
-                    .font(.system(size: 11.5))
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -402,7 +402,7 @@ struct ContentView: View {
             .controlSize(.large)
 
             Label("Credentials stay in your Mac's Keychain", systemImage: "lock.shield.fill")
-                .font(.system(size: 10.5))
+                .font(.system(size: 11))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, minHeight: 260)
@@ -418,7 +418,7 @@ struct ContentView: View {
             Text("Couldn't load \(provider.displayName)")
                 .font(.system(size: 14, weight: .semibold))
             Text(message)
-                .font(.system(size: 11.5))
+                .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)

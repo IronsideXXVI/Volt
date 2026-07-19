@@ -57,8 +57,10 @@ struct ContentView: View {
     private var header: some View {
         HStack(spacing: 9) {
             VoltLogoView(size: 19)
-            Text("Volt")
-                .font(.system(size: 15, weight: .semibold))
+            Text("Volt - AI subscription usage tracker")
+                .font(.system(size: 13, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
 
             Spacer(minLength: 8)
         }

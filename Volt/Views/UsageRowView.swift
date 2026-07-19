@@ -32,7 +32,9 @@ struct UsageRowView: View {
                 }
 
                 VStack(spacing: 4) {
-                    UsageBar(fraction: window.barFraction, fill: metricColor)
+                    // Usage bar always uses the Volt accent; the time bar always
+                    // uses the neutral elapsed color. Neither changes with state.
+                    UsageBar(fraction: window.barFraction, fill: VoltTheme.primary)
                     if let elapsed {
                         UsageBar(fraction: elapsed, fill: VoltTheme.windowElapsed)
                     }
@@ -82,15 +84,6 @@ struct UsageRowView: View {
                     .foregroundStyle(metadataColor)
                     .fixedSize(horizontal: false, vertical: true)
             }
-        }
-    }
-
-    private var metricColor: Color {
-        switch window.quotaState {
-        case .normal: return VoltTheme.primary
-        case .warning, .unavailable: return .orange
-        case .critical, .exhausted: return .red
-        case .inactive: return .secondary
         }
     }
 

@@ -83,8 +83,8 @@ The redacted fixtures cover OpenAI weekly-only, reversed primary/secondary, spli
 The active workflows live in `.github/workflows/`, with synchronized reviewable copies in `automation/workflows/`:
 
 - `build.yml` runs plist validation, warning-clean core tests, and an unsigned macOS build for `dev` and relevant pull requests;
-- `release.yml` uses `depot-macos-26` to build, explicitly sign Sparkle and Volt, notarize and staple both the app and DMG, create generated GitHub release notes, and publish a historical Sparkle appcast plus versioned HTML notes after every approved push to `main`.
+- `release.yml` runs on a free GitHub-hosted `macos-26` runner to build, explicitly sign Sparkle and Volt, notarize and staple both the app and DMG, create generated GitHub release notes, and publish a historical Sparkle appcast plus versioned HTML notes after every approved push to `main`.
 
-The production workflow expects the same five Apple signing/notarization secret names used by the Hacker News project, plus `SPARKLE_PRIVATE_KEY`. Volt's release asset, appcast, and release-note pages must all be anonymously reachable before external Sparkle updates can work. Because the repository is currently private, that distribution requirement is still blocked.
+Both workflows run on standard GitHub-hosted runners, which are free with no minute limits because Volt is a public repository. The production workflow expects the same five Apple signing/notarization secret names used by the Hacker News project, plus a Volt-specific `SPARKLE_PRIVATE_KEY`. The DMG is served from public GitHub release assets and the appcast plus release-note pages from GitHub Pages, so all update URLs are anonymously reachable.
 
-See [Production release setup](docs/release-setup.md) for Depot connection requirements, all six secrets, Sparkle key verification, GitHub Pages setup, the private-repository blocker, promotion rules, and the first-release smoke test.
+See [Production release setup](docs/release-setup.md) for the six secrets, Sparkle key details, GitHub Pages setup, promotion rules, and the first-release smoke test.

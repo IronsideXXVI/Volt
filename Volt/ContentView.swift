@@ -133,31 +133,26 @@ struct ContentView: View {
 
     private func snapshotView(_ snapshot: ProviderUsageSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 8) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(snapshot.provider.displayName) plan usage limits")
-                        .font(.system(size: 15, weight: .semibold))
-                    if let account = trimmed(snapshot.account) {
-                        Text(account)
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                            .textSelection(.enabled)
-                    }
-                    if let plan = trimmed(snapshot.plan) {
-                        Text(plan)
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .textSelection(.enabled)
-                    }
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(snapshot.provider.displayName) plan usage limits")
+                    .font(.system(size: 15, weight: .semibold))
+                if let account = trimmed(snapshot.account) {
+                    Text(account)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .textSelection(.enabled)
                 }
-                Spacer(minLength: 8)
-                if !snapshot.sections.isEmpty {
-                    legend
+                if let plan = trimmed(snapshot.plan) {
+                    Text(plan)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .textSelection(.enabled)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             if let error = store.error(for: snapshot.provider) {
                 banner(error, color: .orange, symbol: "exclamationmark.triangle.fill", prefix: "Showing the last update. ")
@@ -181,22 +176,6 @@ struct ContentView: View {
                 }
             }
         }
-    }
-
-    private var legend: some View {
-        HStack(spacing: 10) {
-            legendItem(color: VoltTheme.primary, title: "Used")
-            legendItem(color: VoltTheme.windowElapsed, title: "Time")
-        }
-    }
-
-    private func legendItem(color: Color, title: String) -> some View {
-        HStack(spacing: 4) {
-            Circle().fill(color).frame(width: 6, height: 6)
-            Text(title)
-        }
-        .font(.system(size: 10, weight: .medium))
-        .foregroundStyle(.secondary)
     }
 
     private func usageSection(_ section: UsageSection) -> some View {

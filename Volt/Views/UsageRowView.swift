@@ -26,7 +26,7 @@ struct UsageRowView: View {
 
                     Text(window.percentageDescription)
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(metricColor)
+                        .foregroundStyle(percentTextColor)
                         .monospacedDigit()
                         .fixedSize()
                 }
@@ -61,7 +61,7 @@ struct UsageRowView: View {
                 if let reset = window.resetsAt {
                     Label(resetDescription(reset, now: now), systemImage: "clock")
                         .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary)
                 }
 
                 Spacer(minLength: 6)
@@ -69,7 +69,7 @@ struct UsageRowView: View {
                 if let elapsed {
                     Text("\(percentString(elapsed)) elapsed")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(VoltTheme.windowElapsed)
+                        .foregroundStyle(.primary)
                         .monospacedDigit()
                         .fixedSize()
                 }
@@ -88,6 +88,17 @@ struct UsageRowView: View {
     private var metricColor: Color {
         switch window.quotaState {
         case .normal: return VoltTheme.primary
+        case .warning, .unavailable: return .orange
+        case .critical, .exhausted: return .red
+        case .inactive: return .secondary
+        }
+    }
+
+    /// The percentage label reads in the primary text color at normal levels,
+    /// but keeps warning/critical colors so a nearly-exhausted limit still pops.
+    private var percentTextColor: Color {
+        switch window.quotaState {
+        case .normal: return .primary
         case .warning, .unavailable: return .orange
         case .critical, .exhausted: return .red
         case .inactive: return .secondary

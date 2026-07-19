@@ -1,0 +1,18 @@
+<?xml version='1.0' encoding='utf-8'?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+  <channel>
+    <title>Volt Updates</title>
+    <link>https://ironsidexxvi.github.io/Volt/appcast.xml</link>
+    <description>Volt release updates</description>
+    <language>en</language>
+    <item>
+      <title>Volt 0.1.2</title>
+      <pubDate>Sun, 19 Jul 2026 17:58:24 +0000</pubDate>
+      <sparkle:version>2</sparkle:version>
+      <sparkle:shortVersionString>0.1.2</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0.0</sparkle:minimumSystemVersion>
+      <sparkle:releaseNotesLink>https://ironsidexxvi.github.io/Volt/releases/0.1.2.html</sparkle:releaseNotesLink>
+      <enclosure url="https://github.com/IronsideXXVI/Volt/releases/download/v0.1.2/Volt-0.1.2.dmg" length="5014187" type="application/octet-stream" sparkle:edSignature="VujACC/LG6c+PiJzIgRpiHsMvT9eld533zXExi5xmqCoVHKdInkS4MUhqkzWU7OBaDep3c8/kL+ALNi851yNBg==" />
+    </item>
+  </channel>
+</rss>

@@ -5,6 +5,7 @@ struct ContentView: View {
     @Environment(UsageStore.self) private var store
 
     @State private var contentHeight: CGFloat = 0
+    @State private var isMenuOpen = false
 
     private let width: CGFloat = 360
     private let maxContentHeight: CGFloat = 520
@@ -42,19 +43,14 @@ struct ContentView: View {
         }
         .frame(width: width)
         .tint(store.selectedProvider.tint)
-        .task(id: store.selectedProvider) {
-            let provider = store.selectedProvider
-            await store.refreshIfNeeded(provider)
-
-            while !Task.isCancelled {
-                do {
-                    try await Task.sleep(for: store.refreshDelay(for: provider))
-                } catch {
-                    break
-                }
-                guard !Task.isCancelled else { break }
-                await store.refresh(provider)
-            }
+        .onAppear { isMenuOpen = true }
+        .onDisappear { isMenuOpen = false }
+        // Fetch only when the menu opens. Switching provider tabs does not
+        // trigger a fetch, and there is no background polling; the refresh
+        // button is the only other way to fetch.
+        .task(id: isMenuOpen) {
+            guard isMenuOpen else { return }
+            await store.refreshOnOpen()
         }
     }
 

@@ -5,7 +5,6 @@ import Observation
 @Observable
 final class UsageStore {
     private static let selectedProviderKey = "selectedProvider"
-    private static let refreshIntervalSeconds: TimeInterval = 10 * 60
 
     var selectedProvider: AIProvider {
         didSet {
@@ -50,13 +49,14 @@ final class UsageStore {
         await refresh(selectedProvider)
     }
 
-    @discardableResult
-    func refreshIfNeeded(_ provider: AIProvider) async -> Bool {
-        if let snapshot = snapshots[provider],
-           Date().timeIntervalSince(snapshot.updatedAt) < 60 {
-            return true
+    /// Fetches every configured provider once. Called when the menu opens so
+    /// both tabs show fresh data without fetching again on tab switch.
+    func refreshOnOpen() async {
+        await withTaskGroup(of: Void.self) { group in
+            for provider in AIProvider.allCases where isConfigured(provider) {
+                group.addTask { await self.refresh(provider) }
+            }
         }
-        return await refresh(provider)
     }
 
     @discardableResult
@@ -119,22 +119,6 @@ final class UsageStore {
             }
         }
         return snapshots[provider] != nil && errors[provider] == nil
-    }
-
-    func refreshDelay(for provider: AIProvider, now: Date = Date()) -> Duration {
-        let regularInterval = Self.refreshIntervalSeconds
-        guard let snapshot = snapshots[provider] else {
-            return .seconds(regularInterval)
-        }
-        let nextReset = snapshot.windows
-            .compactMap(\.resetsAt)
-            .map { $0.timeIntervalSince(now) }
-            .filter { $0 > 0 }
-            .min()
-        guard let nextReset, nextReset < regularInterval else {
-            return .seconds(regularInterval)
-        }
-        return .seconds(max(nextReset + 2, 15))
     }
 
     func claudeCredentials() throws -> ClaudeCredentials {

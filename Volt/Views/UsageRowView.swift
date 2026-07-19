@@ -18,8 +18,9 @@ struct UsageRowView: View {
             VStack(alignment: .leading, spacing: 7) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(showsTitle ? window.title : "Quota consumed")
-                        .font(.system(size: 13, weight: showsTitle ? .medium : .regular))
-                        .foregroundStyle(showsTitle ? .primary : .secondary)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .monospacedDigit()
                         .lineLimit(1)
 
                     Spacer(minLength: 8)
@@ -62,8 +63,9 @@ struct UsageRowView: View {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 if let reset = window.resetsAt {
                     Label(resetDescription(reset, now: now), systemImage: "clock")
-                        .font(.system(size: 11))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.primary)
+                        .monospacedDigit()
                 }
 
                 Spacer(minLength: 6)

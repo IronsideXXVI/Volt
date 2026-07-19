@@ -584,7 +584,7 @@ enum OpenAIUsageNormalizer {
         )
     }
 
-    static func planDisplayName(_ raw: String) -> String {
+    nonisolated static func planDisplayName(_ raw: String) -> String {
         switch raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
         case "prolite":
             return "Pro 5x"
@@ -699,7 +699,7 @@ enum OpenAIUsageNormalizer {
         return slug(shortTitle(for: duration, fallback: "window"))
     }
 
-    private static func formattedWholeNumber(_ value: Double) -> String {
+    nonisolated private static func formattedWholeNumber(_ value: Double) -> String {
         if abs(value.rounded() - value) < 0.01 { return String(Int(value.rounded())) }
         return String(format: "%.1f", value)
     }
@@ -868,7 +868,7 @@ enum OpenAIUsageNormalizer {
         return iso.date(from: trimmed)
     }
 
-    private static func creditLabel(_ amount: Double) -> String {
+    nonisolated private static func creditLabel(_ amount: Double) -> String {
         let number = formattedWholeNumber(amount)
         return amount == 1 ? "\(number) credit" : "\(number) credits"
     }
@@ -892,7 +892,7 @@ enum OpenAIUsageNormalizer {
         return result.trimmingCharacters(in: CharacterSet(charactersIn: "-"))
     }
 
-    private static func readableName(_ raw: String) -> String {
+    nonisolated private static func readableName(_ raw: String) -> String {
         raw.replacingOccurrences(of: "_", with: " ")
             .replacingOccurrences(of: "-", with: " ")
             .split(separator: " ")

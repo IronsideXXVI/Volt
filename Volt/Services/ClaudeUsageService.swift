@@ -598,7 +598,7 @@ enum ClaudeUsageNormalizer {
         return readableName(value)
     }
 
-    private static func readableName(_ raw: String) -> String {
+    nonisolated private static func readableName(_ raw: String) -> String {
         raw.replacingOccurrences(of: "_", with: " ")
             .replacingOccurrences(of: "-", with: " ")
             .split(separator: " ")
@@ -618,7 +618,7 @@ enum ClaudeUsageNormalizer {
         return value
     }
 
-    private static func slug(_ value: String) -> String {
+    nonisolated private static func slug(_ value: String) -> String {
         var result = ""
         var previousWasSeparator = false
         for scalar in value.lowercased().unicodeScalars {

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Volt 0.1.14 release notes</title>
+  <style>
+    body { color: #1f2328; font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0 auto; max-width: 760px; padding: 32px 24px; }
+    a { color: #0969da; }
+    code { background: #f6f8fa; border-radius: 4px; padding: 0.15em 0.35em; }
+    pre { background: #f6f8fa; border-radius: 6px; overflow: auto; padding: 16px; }
+    @media (prefers-color-scheme: dark) { body { background: #0d1117; color: #e6edf3; } a { color: #58a6ff; } code, pre { background: #161b22; } }
+  </style>
+</head>
+<body>
+<h1>Volt 0.1.14</h1>
+<p dir="auto">Rebuild SettingsView entirely on the token system used by the popover so the<br>
+two surfaces read as siblings:</p>
+<ul dir="auto">
+<li>Replace every inline font/color with tokens. Add two field-type tokens,<br>
+voltControlLabel (12 semibold) and voltChipText (11 semibold), reusing the<br>
+existing 12/11 size tiers rather than introducing new sizes.</li>
+<li>Collapse to one accent: primary everywhere, orange for errors, green only in<br>
+the Updates pane. Drop per-provider pane tints and sidebar status dots.</li>
+<li>Flatten the sidebar and drive provider rows/marks with the template logos<br>
+(new VoltLogoGlyph), matching the popover switcher. Convey connection state<br>
+through the title color instead of a redundant chip.</li>
+<li>Route SectionHeader through voltSectionHeader/voltCaption.</li>
+</ul>
+<p dir="auto">Credential import/save-and-test/disconnect/dirty-state logic is unchanged.<br>
+Document the Settings surface and the two tokens in the design system.</p>
+<p dir="auto"><strong>Full commit history:</strong> <a href="https://github.com/IronsideXXVI/Volt/compare/v0.1.13...v0.1.14">v0.1.13 to v0.1.14</a></p></body>
+</html>

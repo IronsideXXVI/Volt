@@ -68,6 +68,10 @@ Rules:
   easy comparison.
 - Provider identity is shown **once** (the switcher). Do not repeat it in a
   hero/header card.
+- Each switcher tab shows the provider's **monochrome logo** to the left of its
+  name. Logos are imported as **template images** (`template-rendering-intent`)
+  and tinted to the tab's label color (primary when selected, secondary when
+  not) so they adapt to light/dark — never a per-provider brand color.
 
 ## Notices, links & Markdown
 
@@ -91,7 +95,9 @@ Rules:
 
 ## Adding a new provider tab (checklist)
 
-1. Add the case to `AIProvider`; keep `tint` = `VoltTheme.primary`.
+1. Add the case to `AIProvider`; keep `tint` = `VoltTheme.primary`. Add a
+   monochrome logo imageset (template rendering, @1x/@2x/@3x) and point
+   `logoAsset` at it.
 2. Normalize its response into the shared `ProviderUsageSnapshot`
    (`UsageSection` / `UsageDetailSection` / `UsageWindow`) — the popover renders
    any provider from these types, so no new view code should be needed.

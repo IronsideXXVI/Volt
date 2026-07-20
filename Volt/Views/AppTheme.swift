@@ -37,6 +37,17 @@ extension AIProvider {
     var tint: Color {
         VoltTheme.primary
     }
+
+    /// The provider's monochrome logo asset (a template image tinted to match
+    /// the surrounding text color).
+    var logoAsset: String {
+        switch self {
+        case .anthropic:
+            return "ClaudeLogo"
+        case .openAI:
+            return "OpenAILogo"
+        }
+    }
 }
 
 extension Color {

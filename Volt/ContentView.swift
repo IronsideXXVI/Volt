@@ -80,10 +80,18 @@ struct ContentView: View {
                         selection.wrappedValue = provider
                     }
                 } label: {
-                    Text(provider.displayName)
-                        .voltTabLabel(selected: isSelected)
-                        .padding(.horizontal, 11)
-                        .frame(maxWidth: .infinity, minHeight: 32)
+                    HStack(spacing: 6) {
+                        Image(provider.logoAsset)
+                            .renderingMode(.template)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 15, height: 15)
+                        Text(provider.displayName)
+                            .voltTabLabel(selected: isSelected)
+                    }
+                    .foregroundStyle(isSelected ? .primary : .secondary)
+                    .padding(.horizontal, 11)
+                    .frame(maxWidth: .infinity, minHeight: 32)
                     .background {
                         if isSelected {
                             RoundedRectangle(cornerRadius: 8, style: .continuous)

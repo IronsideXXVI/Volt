@@ -5,10 +5,20 @@ import Observation
 @Observable
 final class UsageStore {
     private static let selectedProviderKey = "selectedProvider"
+    private static let providerOrderKey = "providerOrder"
 
     var selectedProvider: AIProvider {
         didSet {
             UserDefaults.standard.set(selectedProvider.rawValue, forKey: Self.selectedProviderKey)
+        }
+    }
+
+    /// The order providers appear in the menu switcher, arranged by the user in
+    /// Settings. Persisted across launches; any provider missing from the saved
+    /// order (e.g. one added in a later build) is appended in `allCases` order.
+    var providerOrder: [AIProvider] {
+        didSet {
+            UserDefaults.standard.set(providerOrder.map(\.rawValue), forKey: Self.providerOrderKey)
         }
     }
 
@@ -20,6 +30,14 @@ final class UsageStore {
     init() {
         let saved = UserDefaults.standard.string(forKey: Self.selectedProviderKey)
         selectedProvider = AIProvider(rawValue: saved ?? "") ?? .anthropic
+
+        let savedOrder = (UserDefaults.standard.array(forKey: Self.providerOrderKey) as? [String]) ?? []
+        var order = savedOrder.compactMap(AIProvider.init(rawValue:))
+        for provider in AIProvider.allCases where !order.contains(provider) {
+            order.append(provider)
+        }
+        providerOrder = order
+
         if (try? CredentialStore.loadClaude())?.isComplete == true {
             configuredProviders.insert(.anthropic)
         }
@@ -44,6 +62,19 @@ final class UsageStore {
         configuredProviders.contains(provider)
     }
 
+    /// Moves `provider` to the slot currently held by `target`, shifting the
+    /// rest. Used by the Settings drag-to-reorder list.
+    func reorderProvider(_ provider: AIProvider, toSlotOf target: AIProvider) {
+        guard provider != target,
+              let from = providerOrder.firstIndex(of: provider),
+              let to = providerOrder.firstIndex(of: target)
+        else { return }
+        var order = providerOrder
+        order.remove(at: from)
+        order.insert(provider, at: min(to, order.count))
+        providerOrder = order
+    }
+
     @discardableResult
     func refreshSelected() async -> Bool {
         await refresh(selectedProvider)
@@ -55,7 +86,7 @@ final class UsageStore {
     /// as soon as possible.
     func refreshOnOpen() async {
         var providers = [selectedProvider]
-        providers.append(contentsOf: AIProvider.allCases.filter { $0 != selectedProvider })
+        providers.append(contentsOf: providerOrder.filter { $0 != selectedProvider })
         for provider in providers where isConfigured(provider) {
             await refresh(provider)
         }

@@ -59,8 +59,9 @@ Rules:
   quota state. **Time bars are always `VoltTheme.windowElapsed`.** Neither
   changes.
 - The **only** non-accent colors allowed are semantic: `.red`/`.orange` for
-  warning/critical/error *text and banners* (not bars), `.green` reserved for
-  the Updates/system area, and `.secondary`/`.tertiary` for de-emphasis.
+  warning/critical/error *text and banners* (not bars), and
+  `.secondary`/`.tertiary` for de-emphasis. There is **no green** — even the
+  Updates pane and its controls use the magenta accent.
 
 ## Layout & structure
 
@@ -105,10 +106,14 @@ tokens and the same one-accent restraint**. It is 700×560 with a 190pt
 - Connection state is conveyed by the **color of its title** (`voltControlLabel`
   tinted `primary` connected/ready, `.orange` on error, `.secondary` when not
   connected) — not by a status dot or a redundant chip.
-- **One accent** still holds: `primary` for connected/ready/info/success and the
-  "Recommended"/"Credential ready" chips; `.orange` for errors. **Green is used
-  only in the Updates pane** (the system area). The page tint (`.tint`) is
-  `primary` everywhere except Updates, which is green.
+- **One accent** throughout: `primary` for connected/ready/info/success, the
+  "Recommended"/"Credential ready" chips, and the page tint (`.tint`) on every
+  pane including Updates; `.orange` for errors. No green anywhere.
+- **General → Dashboard order**: providers are listed as drag-to-reorder rows
+  (grip handle + `VoltLogoGlyph` + name) via `.draggable`/`.dropDestination`.
+  The order is persisted on `UsageStore.providerOrder` and drives the popover
+  switcher's tab order. There is no separate "default provider" — the order is
+  the single source of arrangement.
 
 ## Fetch behavior
 

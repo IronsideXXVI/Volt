@@ -73,7 +73,7 @@ struct ContentView: View {
 
     private func providerSwitcher(selection: Binding<AIProvider>) -> some View {
         HStack(spacing: 3) {
-            ForEach(AIProvider.allCases) { provider in
+            ForEach(store.providerOrder) { provider in
                 let isSelected = selection.wrappedValue == provider
                 Button {
                     withAnimation(.easeOut(duration: 0.16)) {

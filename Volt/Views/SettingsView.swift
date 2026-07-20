@@ -1,4 +1,5 @@
 import AppKit
+import CoreTransferable
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -81,12 +82,10 @@ struct SettingsView: View {
         lastRefresh: nil
     )
     @State private var providerToDisconnect: AIProvider?
+    @State private var dropTargetProvider: AIProvider?
 
-    /// One accent everywhere; the Updates pane is the only place green is used,
-    /// per the design system (green is reserved for the system/updates area).
-    private var paneTint: Color {
-        selectedPane == .updates ? .green : VoltTheme.primary
-    }
+    /// One accent everywhere — the Volt magenta — including Updates.
+    private var paneTint: Color { VoltTheme.primary }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -142,15 +141,6 @@ struct SettingsView: View {
             }
 
             Spacer()
-
-            VStack(alignment: .leading, spacing: 7) {
-                Label("Secrets stay in Keychain", systemImage: "lock.shield.fill")
-                    .voltCaption()
-                Text("Volt \(appVersion)")
-                    .voltCaption()
-            }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 16)
         }
         .frame(width: 190)
         .background(.ultraThinMaterial)
@@ -232,10 +222,10 @@ struct SettingsView: View {
     private var generalPane: some View {
         settingsPage(title: "General", subtitle: "Dashboard behavior and local data handling") {
             VStack(alignment: .leading, spacing: 12) {
-                SectionHeader("Default dashboard", detail: "The provider Volt shows when it opens.")
+                SectionHeader("Dashboard order", detail: "Drag to set the order providers appear in the menu.")
                 VStack(spacing: 8) {
-                    ForEach(AIProvider.allCases) { provider in
-                        defaultProviderButton(provider)
+                    ForEach(store.providerOrder) { provider in
+                        providerOrderRow(provider)
                     }
                 }
             }
@@ -490,39 +480,47 @@ struct SettingsView: View {
         }
     }
 
-    private func defaultProviderButton(_ provider: AIProvider) -> some View {
-        let isSelected = store.selectedProvider == provider
+    private func providerOrderRow(_ provider: AIProvider) -> some View {
+        let isDropTarget = dropTargetProvider == provider
 
-        return Button {
-            store.selectedProvider = provider
-        } label: {
-            HStack(spacing: 10) {
-                VoltLogoGlyph(asset: provider.logoAsset, tint: provider.tint, size: 30)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(provider.displayName)
-                        .voltControlLabel()
-                    Text(provider.companyName)
-                        .voltCaption()
-                }
-                Spacer()
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 14))
-                    .foregroundStyle(isSelected ? provider.tint : Color.secondary.opacity(0.4))
+        return HStack(spacing: 11) {
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            VoltLogoGlyph(asset: provider.logoAsset, tint: provider.tint, size: 30)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(provider.displayName)
+                    .voltControlLabel()
+                Text(provider.companyName)
+                    .voltCaption()
             }
-            .padding(10)
-            .frame(maxWidth: .infinity)
-            .background(
-                isSelected ? provider.tint.opacity(0.08) : VoltTheme.card,
-                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .strokeBorder(isSelected ? provider.tint.opacity(0.22) : VoltTheme.hairline, lineWidth: 0.5)
-            }
-            .contentShape(Rectangle())
+            Spacer(minLength: 0)
         }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .padding(10)
+        .frame(maxWidth: .infinity)
+        .background(VoltTheme.card, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(
+                    isDropTarget ? VoltTheme.primary.opacity(0.65) : VoltTheme.hairline,
+                    lineWidth: isDropTarget ? 1 : 0.5
+                )
+        }
+        .contentShape(Rectangle())
+        .draggable(provider)
+        .dropDestination(for: AIProvider.self) { items, _ in
+            dropTargetProvider = nil
+            guard let dragged = items.first else { return false }
+            withAnimation(.easeOut(duration: 0.18)) {
+                store.reorderProvider(dragged, toSlotOf: provider)
+            }
+            return true
+        } isTargeted: { targeted in
+            dropTargetProvider = targeted ? provider : (dropTargetProvider == provider ? nil : dropTargetProvider)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(provider.displayName), drag to reorder")
     }
 
     private func securityRow(_ title: String, detail: String, symbol: String) -> some View {
@@ -662,7 +660,7 @@ struct SettingsView: View {
             oauthAccessToken: nilIfEmpty(claudeOAuthAccessToken),
             oauthRefreshToken: nilIfEmpty(claudeOAuthRefreshToken),
             oauthExpiresAt: claudeOAuthExpiresAt,
-            oauthScopes: claudeOAuthScopes,
+            oauthScopes: claudeOAuthScopes.isEmpty ? nil : claudeOAuthScopes,
             oauthRateLimitTier: claudeOAuthRateLimitTier,
             oauthSubscriptionType: claudeOAuthSubscriptionType
         )
@@ -947,6 +945,15 @@ struct SettingsView: View {
     private func nilIfEmpty(_ value: String) -> String? {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+extension AIProvider: Transferable {
+    static var transferRepresentation: some TransferRepresentation {
+        ProxyRepresentation(
+            exporting: { $0.rawValue },
+            importing: { AIProvider(rawValue: $0) ?? .anthropic }
+        )
     }
 }
 

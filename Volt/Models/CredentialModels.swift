@@ -216,3 +216,43 @@ private func flexibleDouble(_ value: Any?) -> Double? {
         return nil
     }
 }
+
+private func canonicalString(_ value: String?) -> String? {
+    let trimmed = (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
+}
+
+extension ClaudeCredentials {
+    /// Canonical comparison form: trims whitespace and treats empty strings and
+    /// empty scope arrays as absent (nil). Loading a stored credential set and
+    /// re-deriving it from the editable settings fields both pass through this
+    /// form, so a pristine load never registers as an unsaved edit — regardless
+    /// of how the stored value happens to be shaped (a session key saved with a
+    /// trailing newline, nil vs empty OAuth scopes, and so on).
+    var canonical: ClaudeCredentials {
+        ClaudeCredentials(
+            organizationID: organizationID.trimmingCharacters(in: .whitespacesAndNewlines),
+            sessionKey: sessionKey.trimmingCharacters(in: .whitespacesAndNewlines),
+            oauthAccessToken: canonicalString(oauthAccessToken),
+            oauthRefreshToken: canonicalString(oauthRefreshToken),
+            oauthExpiresAt: oauthExpiresAt,
+            oauthScopes: (oauthScopes?.isEmpty ?? true) ? nil : oauthScopes,
+            oauthRateLimitTier: canonicalString(oauthRateLimitTier),
+            oauthSubscriptionType: canonicalString(oauthSubscriptionType)
+        )
+    }
+}
+
+extension OpenAICredentials {
+    /// Canonical comparison form: trims whitespace on every token field. See
+    /// `ClaudeCredentials.canonical`.
+    var canonical: OpenAICredentials {
+        OpenAICredentials(
+            accessToken: accessToken.trimmingCharacters(in: .whitespacesAndNewlines),
+            refreshToken: refreshToken.trimmingCharacters(in: .whitespacesAndNewlines),
+            idToken: idToken.trimmingCharacters(in: .whitespacesAndNewlines),
+            accountID: accountID.trimmingCharacters(in: .whitespacesAndNewlines),
+            lastRefresh: lastRefresh
+        )
+    }
+}

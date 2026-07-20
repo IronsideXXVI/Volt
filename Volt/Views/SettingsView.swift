@@ -654,27 +654,35 @@ struct SettingsView: View {
     // MARK: Credential state
 
     private var draftClaudeCredentials: ClaudeCredentials {
-        ClaudeCredentials(
-            organizationID: organizationID.trimmingCharacters(in: .whitespacesAndNewlines),
-            sessionKey: claudeSessionKey.trimmingCharacters(in: .whitespacesAndNewlines),
-            oauthAccessToken: nilIfEmpty(claudeOAuthAccessToken),
-            oauthRefreshToken: nilIfEmpty(claudeOAuthRefreshToken),
+        normalizedClaude(ClaudeCredentials(
+            organizationID: organizationID,
+            sessionKey: claudeSessionKey,
+            oauthAccessToken: claudeOAuthAccessToken,
+            oauthRefreshToken: claudeOAuthRefreshToken,
             oauthExpiresAt: claudeOAuthExpiresAt,
-            oauthScopes: claudeOAuthScopes.isEmpty ? nil : claudeOAuthScopes,
+            oauthScopes: claudeOAuthScopes,
             oauthRateLimitTier: claudeOAuthRateLimitTier,
             oauthSubscriptionType: claudeOAuthSubscriptionType
-        )
+        ))
     }
 
     private var draftOpenAICredentials: OpenAICredentials {
-        OpenAICredentials(
-            accessToken: openAIAccessToken.trimmingCharacters(in: .whitespacesAndNewlines),
-            refreshToken: openAIRefreshToken.trimmingCharacters(in: .whitespacesAndNewlines),
-            idToken: openAIIDToken.trimmingCharacters(in: .whitespacesAndNewlines),
-            accountID: openAIAccountID.trimmingCharacters(in: .whitespacesAndNewlines),
+        normalizedOpenAI(OpenAICredentials(
+            accessToken: openAIAccessToken,
+            refreshToken: openAIRefreshToken,
+            idToken: openAIIDToken,
+            accountID: openAIAccountID,
             lastRefresh: openAILastRefresh
-        )
+        ))
     }
+
+    /// The canonical form used for *both* the live draft and the saved baseline,
+    /// so a freshly loaded credential set is never mistaken for an edit. Because
+    /// both sides pass through the same normalization (`canonical`), dirty state
+    /// is true only when the user actually changes a value.
+    private func normalizedClaude(_ c: ClaudeCredentials) -> ClaudeCredentials { c.canonical }
+
+    private func normalizedOpenAI(_ c: OpenAICredentials) -> OpenAICredentials { c.canonical }
 
     private var appVersion: String {
         "\(bundleValue("CFBundleShortVersionString")) (\(bundleValue("CFBundleVersion")))"
@@ -694,7 +702,7 @@ struct SettingsView: View {
         do {
             let credentials = try store.claudeCredentials()
             applyClaudeCredentials(credentials)
-            savedClaudeCredentials = credentials
+            savedClaudeCredentials = normalizedClaude(credentials)
         } catch {
             statuses[.anthropic] = SettingsStatus(message: error.localizedDescription, kind: .error)
         }
@@ -702,7 +710,7 @@ struct SettingsView: View {
         do {
             let credentials = try store.openAICredentials()
             applyOpenAICredentials(credentials)
-            savedOpenAICredentials = credentials
+            savedOpenAICredentials = normalizedOpenAI(credentials)
         } catch {
             statuses[.openAI] = SettingsStatus(message: error.localizedDescription, kind: .error)
         }
@@ -735,7 +743,7 @@ struct SettingsView: View {
                 if succeeded, store.snapshot(for: .anthropic) != nil {
                     if let refreshed = try? store.claudeCredentials() {
                         let draftWasUnchanged = draftClaudeCredentials == credentials
-                        savedClaudeCredentials = refreshed
+                        savedClaudeCredentials = normalizedClaude(refreshed)
                         if draftWasUnchanged {
                             applyClaudeCredentials(refreshed)
                             dirtyProviders.remove(.anthropic)
@@ -786,7 +794,7 @@ struct SettingsView: View {
                 if succeeded, store.snapshot(for: .openAI) != nil {
                     if let refreshed = try? store.openAICredentials() {
                         let draftWasUnchanged = draftOpenAICredentials == credentials
-                        savedOpenAICredentials = refreshed
+                        savedOpenAICredentials = normalizedOpenAI(refreshed)
                         if draftWasUnchanged {
                             applyOpenAICredentials(refreshed)
                             dirtyProviders.remove(.openAI)

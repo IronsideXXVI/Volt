@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(UsageStore.self) private var store
+    @Environment(\.openSettings) private var openSettings
 
     @State private var contentHeight: CGFloat = 0
 
@@ -50,6 +51,15 @@ struct ContentView: View {
         .onAppear {
             Task { await store.refreshOnOpen() }
         }
+    }
+
+    /// Brings Volt to the foreground and opens Settings. Volt is an agent app
+    /// (LSUIElement), so without an explicit activate the Settings window would
+    /// open behind whatever app is frontmost; activating also lets the menu-bar
+    /// popover dismiss as focus moves to the Settings window.
+    private func showSettings() {
+        NSApp.activate(ignoringOtherApps: true)
+        openSettings()
     }
 
     // MARK: Header
@@ -394,7 +404,7 @@ struct ContentView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            SettingsLink {
+            Button(action: showSettings) {
                 Text("Set up \(provider.displayName)")
                     .frame(minWidth: 120)
             }
@@ -428,7 +438,7 @@ struct ContentView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(provider.tint)
 
-                SettingsLink { Text("Settings") }
+                Button("Settings", action: showSettings)
                     .buttonStyle(.bordered)
             }
         }
@@ -459,7 +469,7 @@ struct ContentView: View {
                 .disabled(store.isLoading(store.selectedProvider) || !store.isConfigured(store.selectedProvider))
                 .keyboardShortcut("r", modifiers: .command)
 
-                SettingsLink {
+                Button(action: showSettings) {
                     Image(systemName: "gearshape")
                         .font(.system(size: 13))
                         .frame(width: 24, height: 24)

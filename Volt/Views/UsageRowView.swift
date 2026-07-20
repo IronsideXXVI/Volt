@@ -51,7 +51,10 @@ struct UsageRowView: View {
     @ViewBuilder
     private func metadata(elapsed: Double?, now: Date) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            if let status = window.statusDescription {
+            // "Limit reached" is redundant with the "100% used" figure above and
+            // is the last bit of state-driven color in a row, so it's omitted
+            // visually (VoiceOver still reads it via the accessibility value).
+            if let status = window.statusDescription, window.quotaState != .exhausted {
                 Label(status, systemImage: statusSymbol)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(metadataColor)

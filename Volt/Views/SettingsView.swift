@@ -28,11 +28,11 @@ private enum SettingsPane: String, CaseIterable, Identifiable, Equatable {
         }
     }
 
-    var groupTitle: String {
+    var provider: AIProvider? {
         switch self {
-        case .general: return "Workspace"
-        case .claude, .openAI: return "Connections"
-        case .updates: return "System"
+        case .claude: return .anthropic
+        case .openAI: return .openAI
+        case .general, .updates: return nil
         }
     }
 }
@@ -82,13 +82,10 @@ struct SettingsView: View {
     )
     @State private var providerToDisconnect: AIProvider?
 
+    /// One accent everywhere; the Updates pane is the only place green is used,
+    /// per the design system (green is reserved for the system/updates area).
     private var paneTint: Color {
-        switch selectedPane {
-        case .claude: return AIProvider.anthropic.tint
-        case .openAI: return AIProvider.openAI.tint
-        case .updates: return .green
-        case .general: return VoltTheme.primary
-        }
+        selectedPane == .updates ? .green : VoltTheme.primary
     }
 
     var body: some View {
@@ -130,27 +127,27 @@ struct SettingsView: View {
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 9) {
-                VoltLogoView(size: 20)
+                VoltLogoView(size: 18)
                 Text("Volt")
-                    .font(.system(size: 15, weight: .semibold))
+                    .voltHeaderTitle()
             }
             .padding(.horizontal, 16)
             .padding(.top, 18)
-            .padding(.bottom, 20)
+            .padding(.bottom, 18)
 
-            sidebarGroup("Workspace", panes: [.general])
-            sidebarGroup("Connections", panes: [.claude, .openAI])
-            sidebarGroup("System", panes: [.updates])
+            VStack(spacing: 2) {
+                ForEach(SettingsPane.allCases) { pane in
+                    sidebarButton(pane)
+                }
+            }
 
             Spacer()
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 7) {
                 Label("Secrets stay in Keychain", systemImage: "lock.shield.fill")
-                    .font(.system(size: 10.5, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .voltCaption()
                 Text("Volt \(appVersion)")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.tertiary)
+                    .voltCaption()
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 16)
@@ -159,57 +156,37 @@ struct SettingsView: View {
         .background(.ultraThinMaterial)
     }
 
-    private func sidebarGroup(_ title: String, panes: [SettingsPane]) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title.uppercased())
-                .font(.system(size: 9.5, weight: .semibold))
-                .tracking(0.6)
-                .foregroundStyle(.tertiary)
-                .padding(.horizontal, 18)
-                .padding(.bottom, 3)
-
-            ForEach(panes) { pane in
-                sidebarButton(pane)
-            }
-        }
-        .padding(.bottom, 18)
-    }
-
     private func sidebarButton(_ pane: SettingsPane) -> some View {
-        let provider: AIProvider? = switch pane {
-        case .claude: .anthropic
-        case .openAI: .openAI
-        case .general, .updates: nil
-        }
         let isSelected = selectedPane == pane
-        let tint = provider?.tint ?? (pane == .updates ? Color.green : VoltTheme.primary)
 
         return Button {
             withAnimation(.easeOut(duration: 0.14)) {
                 selectedPane = pane
             }
         } label: {
-            HStack(spacing: 9) {
-                Image(systemName: pane.symbol)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(isSelected ? tint : .secondary)
-                    .frame(width: 18)
+            HStack(spacing: 10) {
+                Group {
+                    if let provider = pane.provider {
+                        Image(provider.logoAsset)
+                            .renderingMode(.template)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 15, height: 15)
+                    } else {
+                        Image(systemName: pane.symbol)
+                            .font(.system(size: 13, weight: .medium))
+                            .frame(width: 15, height: 15)
+                    }
+                }
+                .foregroundStyle(isSelected ? VoltTheme.primary : Color.secondary)
 
                 Text(pane.title)
-                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? .primary : .secondary)
+                    .voltTabLabel(selected: isSelected)
 
-                Spacer(minLength: 4)
-
-                if let provider {
-                    Circle()
-                        .fill(connectionColor(for: provider))
-                        .frame(width: 6, height: 6)
-                        .accessibilityLabel(connectionTitle(for: provider))
-                }
+                Spacer(minLength: 0)
             }
             .padding(.horizontal, 10)
-            .frame(height: 32)
+            .frame(height: 34)
             .background(
                 isSelected ? VoltTheme.cardHover : Color.clear,
                 in: RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -279,23 +256,22 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 14) {
                 SectionHeader("Software updates", detail: "Volt checks securely through Sparkle.")
 
-                Toggle(
-                    "Automatically check for updates",
-                    isOn: Binding(
-                        get: { updates.automaticallyChecksForUpdates },
-                        set: { updates.automaticallyChecksForUpdates = $0 }
-                    )
-                )
-                .font(.system(size: 13))
+                Toggle(isOn: Binding(
+                    get: { updates.automaticallyChecksForUpdates },
+                    set: { updates.automaticallyChecksForUpdates = $0 }
+                )) {
+                    Text("Automatically check for updates")
+                        .voltControlLabel()
+                }
 
                 Divider()
 
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Installed version")
-                            .font(.system(size: 13))
+                            .voltControlLabel()
                         Text(appVersion)
-                            .font(.system(size: 11, design: .monospaced))
+                            .voltDetailValue()
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
@@ -343,8 +319,7 @@ struct SettingsView: View {
                             .textFieldStyle(.roundedBorder)
                         SecretInput(title: "Session key", text: $claudeSessionKey)
                         Text("Use the organization UUID and `sessionKey` cookie from a signed-in claude.ai session. Browser sessions can expire or be challenged by Cloudflare.")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
+                            .voltCaption()
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(.top, 12)
@@ -387,8 +362,7 @@ struct SettingsView: View {
                 "Codex plan limits use ChatGPT's authenticated usage endpoint. It is not a public API and may change.",
                 systemImage: "info.circle.fill"
             )
-            .font(.system(size: 11))
-            .foregroundStyle(.secondary)
+            .voltCaption()
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 2)
         }
@@ -437,15 +411,10 @@ struct SettingsView: View {
 
     private func pageHeader(title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(selectedPane.groupTitle.uppercased())
-                .font(.system(size: 9.5, weight: .semibold))
-                .tracking(0.6)
-                .foregroundStyle(paneTint)
             Text(title)
-                .font(.system(size: 20, weight: .bold))
+                .voltTitle()
             Text(subtitle)
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+                .voltCaption()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 20)
@@ -460,25 +429,19 @@ struct SettingsView: View {
 
     private func connectionStatusCard(for provider: AIProvider) -> some View {
         HStack(spacing: 12) {
-            VoltGlyph(symbol: provider.systemImage, tint: provider.tint, size: 34)
+            VoltLogoGlyph(asset: provider.logoAsset, tint: provider.tint, size: 36)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(connectionTitle(for: provider))
-                    .font(.system(size: 13, weight: .semibold))
+                    .voltControlLabel()
+                    .foregroundStyle(connectionColor(for: provider))
                 Text(connectionDetail(for: provider))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                    .voltCaption()
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer(minLength: 12)
-
-            statusChip(
-                title: store.isConfigured(provider) ? "Configured" : "Setup required",
-                color: connectionColor(for: provider),
-                symbol: store.isConfigured(provider) ? "checkmark" : "plus"
-            )
         }
         .voltCard()
     }
@@ -494,14 +457,13 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 11) {
             HStack(alignment: .firstTextBaseline) {
                 Label(title, systemImage: "terminal.fill")
-                    .font(.system(size: 13, weight: .semibold))
+                    .voltControlLabel()
                 Spacer()
-                statusChip(title: "Recommended", color: provider.tint, symbol: "star.fill")
+                statusChip(title: "Recommended", color: VoltTheme.primary, symbol: "star.fill")
             }
 
             Text(detail)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+                .voltCaption()
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 10) {
@@ -509,10 +471,10 @@ struct SettingsView: View {
                     Label(buttonTitle, systemImage: "square.and.arrow.down")
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(provider.tint)
+                .tint(VoltTheme.primary)
 
                 if isReady {
-                    statusChip(title: "Credential ready", color: .green, symbol: "checkmark")
+                    statusChip(title: "Credential ready", color: VoltTheme.primary, symbol: "checkmark")
                 }
             }
         }
@@ -522,10 +484,9 @@ struct SettingsView: View {
     private func advancedLabel(_ title: String, detail: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(.system(size: 13, weight: .medium))
+                .voltControlLabel()
             Text(detail)
-                .font(.system(size: 10.5))
-                .foregroundStyle(.secondary)
+                .voltCaption()
         }
     }
 
@@ -536,13 +497,12 @@ struct SettingsView: View {
             store.selectedProvider = provider
         } label: {
             HStack(spacing: 10) {
-                VoltGlyph(symbol: provider.systemImage, tint: provider.tint, size: 30)
+                VoltLogoGlyph(asset: provider.logoAsset, tint: provider.tint, size: 30)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(provider.displayName)
-                        .font(.system(size: 12.5, weight: .semibold))
+                        .voltControlLabel()
                     Text(provider.companyName)
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.secondary)
+                        .voltCaption()
                 }
                 Spacer()
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
@@ -569,14 +529,13 @@ struct SettingsView: View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: symbol)
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.green)
+                .foregroundStyle(.secondary)
                 .frame(width: 16, height: 16)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(.system(size: 12.5, weight: .medium))
+                    .voltControlLabel()
                 Text(detail)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                    .voltCaption()
             }
             Spacer(minLength: 0)
         }
@@ -585,11 +544,11 @@ struct SettingsView: View {
     private func statusChip(title: String, color: Color, symbol: String) -> some View {
         HStack(spacing: 4) {
             Image(systemName: symbol)
-                .font(.system(size: 8.5, weight: .bold))
+                .font(.system(size: 9, weight: .bold))
             Text(title)
                 .lineLimit(1)
         }
-        .font(.system(size: 10.5, weight: .medium))
+        .voltChipText()
         .foregroundStyle(color)
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
@@ -606,13 +565,13 @@ struct SettingsView: View {
             case .error: "exclamationmark.triangle.fill"
             }
             let color: Color = switch status.kind {
-            case .information: provider.tint
-            case .success: .green
+            case .information: VoltTheme.primary
+            case .success: VoltTheme.primary
             case .error: .orange
             }
 
             Label(status.message, systemImage: symbol)
-                .font(.system(size: 11, weight: .medium))
+                .voltChipText()
                 .foregroundStyle(color)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(11)
@@ -635,8 +594,8 @@ struct SettingsView: View {
 
             if dirtyProviders.contains(provider) {
                 Label("Unsaved changes", systemImage: "circle.fill")
-                    .font(.system(size: 10.5, weight: .medium))
-                    .foregroundStyle(provider.tint)
+                    .voltChipText()
+                    .foregroundStyle(VoltTheme.primary)
             }
 
             Button(action: save) {
@@ -649,7 +608,7 @@ struct SettingsView: View {
                 .frame(minWidth: 78)
             }
             .buttonStyle(.borderedProminent)
-            .tint(provider.tint)
+            .tint(VoltTheme.primary)
             .disabled(store.isLoading(provider) || testingProviders.contains(provider))
         }
         .padding(.horizontal, 20)
@@ -686,10 +645,12 @@ struct SettingsView: View {
     }
 
     private func connectionColor(for provider: AIProvider) -> Color {
-        if testingProviders.contains(provider) || dirtyProviders.contains(provider) { return provider.tint }
-        if store.snapshot(for: provider) != nil, store.error(for: provider) == nil { return .green }
         if store.error(for: provider) != nil { return .orange }
-        return store.isConfigured(provider) ? provider.tint : Color.secondary.opacity(0.4)
+        if store.snapshot(for: provider) != nil { return VoltTheme.primary }
+        if store.isConfigured(provider) || dirtyProviders.contains(provider) || testingProviders.contains(provider) {
+            return VoltTheme.primary
+        }
+        return .secondary
     }
 
     // MARK: Credential state

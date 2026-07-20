@@ -117,6 +117,25 @@ struct VoltGlyph: View {
     }
 }
 
+/// A provider's monochrome logo on a low-opacity rounded square — the branded
+/// counterpart to `VoltGlyph`, matching the logos shown in the popover switcher.
+struct VoltLogoGlyph: View {
+    let asset: String
+    let tint: Color
+    var size: CGFloat = 34
+
+    var body: some View {
+        Image(asset)
+            .renderingMode(.template)
+            .resizable()
+            .scaledToFit()
+            .frame(width: size * 0.5, height: size * 0.5)
+            .foregroundStyle(tint)
+            .frame(width: size, height: size)
+            .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: size * 0.3, style: .continuous))
+    }
+}
+
 /// A concise section heading: a title with an optional trailing accessory.
 struct SectionHeader<Accessory: View>: View {
     let title: String
@@ -127,11 +146,10 @@ struct SectionHeader<Accessory: View>: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 13, weight: .semibold))
+                    .voltSectionHeader()
                 if let detail {
                     Text(detail)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                        .voltCaption()
                 }
             }
             Spacer(minLength: 8)
@@ -179,6 +197,14 @@ extension View {
 
     /// The footer status text + control glyphs.
     func voltFooterText() -> some View { font(.system(size: 12, weight: .medium)) }
+
+    /// A settings control/row primary label — a provider name in a picker, a
+    /// toggle's title, a key in a key/value row, a disclosure heading.
+    func voltControlLabel() -> some View { font(.system(size: 12, weight: .semibold)) }
+
+    /// Emphatic small text inside a status pill or inline status label. The
+    /// caller supplies the semantic color (primary / orange / green).
+    func voltChipText() -> some View { font(.system(size: 11, weight: .semibold)) }
 }
 
 extension View {

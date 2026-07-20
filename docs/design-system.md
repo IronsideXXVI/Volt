@@ -25,10 +25,14 @@ Every text element uses exactly one of these `View` modifiers. Do not use
 | `voltFooterText()` | 12 medium | Footer status text + control glyphs |
 | `voltCaption()` | 11, **secondary** | Account/plan lines, section & credit subtitles, notices, detail-row labels, empty/edge messages |
 | `voltDetailValue()` | 11 semibold, monospaced | A key/value detail row's value ("$0.00", "Off", "Jul 31") |
+| `voltControlLabel()` | 12 semibold | A settings control/row label: provider name in a picker, toggle title, key in a key/value row, disclosure heading, connection-state title |
+| `voltChipText()` | 11 semibold | Emphatic small text in a status pill or inline status label (caller supplies the semantic color) |
 
 Size tiers, high to low: **15** title · **14** state heading · **13**
-header/tabs/section headers · **12** usage-row + footer · **11** captions +
-detail values. There are **no half-point sizes** and no other body sizes.
+header/tabs/section headers · **12** usage-row + control labels · **11**
+captions + detail values + chips. There are **no half-point sizes** and no
+other body sizes. `voltControlLabel`/`voltChipText` reuse the 12/11 tiers — the
+Settings window introduces no new sizes, only these two field types.
 
 Icons are exempt (they are sized to match their adjacent text, e.g. footer
 glyphs at 13, notice/status icons at 11).
@@ -85,6 +89,26 @@ Rules:
   bootstrap `org_growthbook.features` (locale → Markdown), never by hardcoded
   feature id. It sits under **Weekly limits**, with "Learn more about usage
   limits" beneath it.
+
+## Settings window
+
+The Settings window is a sibling surface to the popover and uses the **same
+tokens and the same one-accent restraint**. It is 700×560 with a 190pt
+`.ultraThinMaterial` sidebar.
+
+- The sidebar is a **flat** list (General · Claude · OpenAI · Updates) — no group
+  eyebrows. Provider rows use the **template logo** (tinted to the label color,
+  like the popover switcher); non-provider rows use an SF Symbol. There are **no
+  connection dots** in the sidebar.
+- Sections are `voltCard()`s. A provider mark is drawn with `VoltLogoGlyph`
+  (the branded counterpart to `VoltGlyph`), never a per-provider brand color.
+- Connection state is conveyed by the **color of its title** (`voltControlLabel`
+  tinted `primary` connected/ready, `.orange` on error, `.secondary` when not
+  connected) — not by a status dot or a redundant chip.
+- **One accent** still holds: `primary` for connected/ready/info/success and the
+  "Recommended"/"Credential ready" chips; `.orange` for errors. **Green is used
+  only in the Updates pane** (the system area). The page tint (`.tint`) is
+  `primary` everywhere except Updates, which is green.
 
 ## Fetch behavior
 

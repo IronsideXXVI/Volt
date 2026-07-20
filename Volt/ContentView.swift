@@ -55,11 +55,15 @@ struct ContentView: View {
 
     /// Brings Volt to the foreground and opens Settings. Volt is an agent app
     /// (LSUIElement), so without an explicit activate the Settings window would
-    /// open behind whatever app is frontmost; activating also lets the menu-bar
-    /// popover dismiss as focus moves to the Settings window.
+    /// open behind whatever app is frontmost. The MenuBarExtra popover doesn't
+    /// dismiss on its own here, so we close it explicitly: while it's shown it is
+    /// the process's key window (that's why ⌘R/⌘, work inside it), captured
+    /// before focus moves to the Settings window.
     private func showSettings() {
+        let dashboard = NSApp.keyWindow
         NSApp.activate(ignoringOtherApps: true)
         openSettings()
+        dashboard?.close()
     }
 
     // MARK: Header

@@ -156,6 +156,18 @@ extension View {
     /// Secondary descriptive text: account/plan lines, subtitles, notices,
     /// detail labels, and empty/edge messages.
     func voltCaption() -> some View { font(.system(size: 11)).foregroundStyle(.secondary) }
+
+    /// The app wordmark in the top bar.
+    func voltHeaderTitle() -> some View { font(.system(size: 13, weight: .semibold)) }
+
+    /// A provider switcher tab label.
+    func voltTabLabel(selected: Bool) -> some View {
+        font(.system(size: 13, weight: selected ? .semibold : .medium))
+            .foregroundStyle(selected ? .primary : .secondary)
+    }
+
+    /// The footer status text + control glyphs.
+    func voltFooterText() -> some View { font(.system(size: 12, weight: .medium)) }
 }
 
 extension View {

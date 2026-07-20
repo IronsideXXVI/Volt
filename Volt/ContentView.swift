@@ -58,7 +58,7 @@ struct ContentView: View {
         HStack(spacing: 9) {
             VoltLogoView(size: 19)
             Text("Volt - AI subscription usage tracker")
-                .font(.system(size: 13, weight: .semibold))
+                .voltHeaderTitle()
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
 
@@ -81,8 +81,7 @@ struct ContentView: View {
                     }
                 } label: {
                     Text(provider.displayName)
-                        .font(.system(size: 12.5, weight: isSelected ? .semibold : .medium))
-                        .foregroundStyle(isSelected ? .primary : .secondary)
+                        .voltTabLabel(selected: isSelected)
                         .padding(.horizontal, 11)
                         .frame(maxWidth: .infinity, minHeight: 32)
                     .background {
@@ -469,7 +468,7 @@ struct ContentView: View {
                 }
                 .keyboardShortcut("q", modifiers: .command)
             }
-            .font(.system(size: 12, weight: .medium))
+            .voltFooterText()
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
         }

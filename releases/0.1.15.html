@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Volt 0.1.15 release notes</title>
+  <style>
+    body { color: #1f2328; font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0 auto; max-width: 760px; padding: 32px 24px; }
+    a { color: #0969da; }
+    code { background: #f6f8fa; border-radius: 4px; padding: 0.15em 0.35em; }
+    pre { background: #f6f8fa; border-radius: 6px; overflow: auto; padding: 16px; }
+    @media (prefers-color-scheme: dark) { body { background: #0d1117; color: #e6edf3; } a { color: #58a6ff; } code, pre { background: #161b22; } }
+  </style>
+</head>
+<body>
+<h1>Volt 0.1.15</h1>
+<ul dir="auto">
+<li>General: replace the default-provider picker with a drag-to-reorder<br>
+'Dashboard order' list (grip handle + logo + name) backed by a persisted<br>
+UsageStore.providerOrder, which now drives the popover switcher's tab order.<br>
+Providers reorder via .draggable/.dropDestination; AIProvider is Transferable.</li>
+<li>Fix Claude showing 'Unsaved changes' on tab open for browser-session users:<br>
+oauthScopes is optional, so applying nil credentials produced an empty array<br>
+that no longer matched the saved nil. The draft now emits nil for empty scopes<br>
+so the load round-trip is identity.</li>
+<li>Updates pane now uses the magenta accent like everywhere else; green is no<br>
+longer used anywhere.</li>
+<li>Remove the sidebar footer (Keychain note + version) — both are already stated<br>
+in General → Privacy and Updates.</li>
+</ul>
+<p dir="auto">Docs updated to match (no green, Dashboard order).</p>
+<p dir="auto"><strong>Full commit history:</strong> <a href="https://github.com/IronsideXXVI/Volt/compare/v0.1.14...v0.1.15">v0.1.14 to v0.1.15</a></p></body>
+</html>

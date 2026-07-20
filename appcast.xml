@@ -6,6 +6,15 @@
     <description>Volt release updates</description>
     <language>en</language>
     <item>
+      <title>Volt 0.1.19</title>
+      <pubDate>Mon, 20 Jul 2026 13:50:59 +0000</pubDate>
+      <sparkle:version>19</sparkle:version>
+      <sparkle:shortVersionString>0.1.19</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0.0</sparkle:minimumSystemVersion>
+      <sparkle:releaseNotesLink>https://ironsidexxvi.github.io/Volt/releases/0.1.19.html</sparkle:releaseNotesLink>
+      <enclosure url="https://github.com/IronsideXXVI/Volt/releases/download/v0.1.19/Volt-0.1.19.dmg" length="5030789" type="application/octet-stream" sparkle:edSignature="iG2rivCsvSpgiuuYltlU4KsmcfC/sHG5Y7pS+aS5TyMgmVg+jqhLLO1M2Y6bBBZDcg69lMJz4R5gCJiSx7raAA==" />
+    </item>
+    <item>
       <title>Volt 0.1.18</title>
       <pubDate>Mon, 20 Jul 2026 11:46:11 +0000</pubDate>
       <sparkle:version>18</sparkle:version>
@@ -130,15 +139,6 @@
       <sparkle:minimumSystemVersion>14.0.0</sparkle:minimumSystemVersion>
       <sparkle:releaseNotesLink>https://ironsidexxvi.github.io/Volt/releases/0.1.5.html</sparkle:releaseNotesLink>
       <enclosure url="https://github.com/IronsideXXVI/Volt/releases/download/v0.1.5/Volt-0.1.5.dmg" length="5014496" type="application/octet-stream" sparkle:edSignature="eK4zeG8FtXtETJPOy1djzxMj5X3E4BLVrb5IHDvND4DGahsXPuZ+wPImDSJLBsktd5RiUyDr3ayGAnfVDbBIDQ==" />
-    </item>
-    <item>
-      <title>Volt 0.1.4</title>
-      <pubDate>Sun, 19 Jul 2026 18:36:54 +0000</pubDate>
-      <sparkle:version>4</sparkle:version>
-      <sparkle:shortVersionString>0.1.4</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>14.0.0</sparkle:minimumSystemVersion>
-      <sparkle:releaseNotesLink>https://ironsidexxvi.github.io/Volt/releases/0.1.4.html</sparkle:releaseNotesLink>
-      <enclosure url="https://github.com/IronsideXXVI/Volt/releases/download/v0.1.4/Volt-0.1.4.dmg" length="5014480" type="application/octet-stream" sparkle:edSignature="vgS9TtzOlY8zjSaa/9sUJ/rafpVSByYG5R18izAbHcD68kLlCKHgsOgg9GJCRP4YYEchWB8umFpeZlUajRF1Dg==" />
     </item>
   </channel>
 </rss>

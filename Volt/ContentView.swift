@@ -136,19 +136,17 @@ struct ContentView: View {
         return VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(snapshot.provider.displayName) plan usage limits")
-                    .font(.system(size: 15, weight: .semibold))
+                    .voltTitle()
                 if let account = trimmed(snapshot.account) {
                     Text(account)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                        .voltCaption()
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .textSelection(.enabled)
                 }
                 if let plan = trimmed(snapshot.plan) {
                     Text(plan)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                        .voltCaption()
                         .lineLimit(1)
                         .textSelection(.enabled)
                 }
@@ -245,7 +243,7 @@ struct ContentView: View {
             if !isSelfTitled {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(section.title)
-                        .font(.system(size: 13, weight: .semibold))
+                        .voltSectionHeader()
                     if let subtitle = section.subtitle {
                         Text(styledMarkdown(subtitle))
                             .foregroundStyle(.secondary)
@@ -269,7 +267,7 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 9) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(section.title)
-                    .font(.system(size: 13, weight: .semibold))
+                    .voltSectionHeader()
                 if let subtitle = section.subtitle {
                     Text(styledMarkdown(subtitle))
                         .foregroundStyle(.secondary)
@@ -280,16 +278,14 @@ struct ContentView: View {
             ForEach(section.items) { item in
                 if item.value.isEmpty {
                     Text(item.title)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                        .voltCaption()
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     HStack(alignment: .firstTextBaseline, spacing: 12) {
                         VStack(alignment: .leading, spacing: 1) {
                             Text(item.title)
-                                .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
+                                .voltCaption()
                             if let detail = item.detail {
                                 Text(detail)
                                     .font(.system(size: 11))
@@ -298,7 +294,7 @@ struct ContentView: View {
                         }
                         Spacer(minLength: 8)
                         Text(item.value)
-                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            .voltDetailValue()
                             .multilineTextAlignment(.trailing)
                             .lineLimit(2)
                             .textSelection(.enabled)
@@ -314,10 +310,9 @@ struct ContentView: View {
                 .font(.system(size: 22, weight: .regular))
                 .foregroundStyle(.secondary)
             Text("No active usage limits")
-                .font(.system(size: 13, weight: .semibold))
+                .voltStateTitle()
             Text("This provider did not return any dashboard fields for the account.")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+                .voltCaption()
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
@@ -373,7 +368,7 @@ struct ContentView: View {
                 .controlSize(.large)
                 .tint(store.selectedProvider.tint)
             Text("Syncing \(store.selectedProvider.displayName)")
-                .font(.system(size: 13, weight: .medium))
+                .voltStateTitle()
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, minHeight: 240)
@@ -385,10 +380,9 @@ struct ContentView: View {
 
             VStack(spacing: 5) {
                 Text("Connect \(provider.displayName)")
-                    .font(.system(size: 15, weight: .semibold))
+                    .voltStateTitle()
                 Text(configurationInstructions(for: provider))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                    .voltCaption()
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -402,8 +396,7 @@ struct ContentView: View {
             .controlSize(.large)
 
             Label("Credentials stay in your Mac's Keychain", systemImage: "lock.shield.fill")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+                .voltCaption()
         }
         .frame(maxWidth: .infinity, minHeight: 260)
         .padding(.horizontal, 12)
@@ -416,10 +409,9 @@ struct ContentView: View {
                 .font(.system(size: 24))
                 .foregroundStyle(.orange)
             Text("Couldn't load \(provider.displayName)")
-                .font(.system(size: 14, weight: .semibold))
+                .voltStateTitle()
             Text(message)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+                .voltCaption()
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 8) {

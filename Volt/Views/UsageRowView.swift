@@ -18,17 +18,14 @@ struct UsageRowView: View {
             VStack(alignment: .leading, spacing: 7) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(showsTitle ? window.title : "Quota consumed")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .monospacedDigit()
+                        .voltRowText()
+                        .foregroundStyle(showsTitle ? .primary : .secondary)
                         .lineLimit(1)
 
                     Spacer(minLength: 8)
 
                     Text(window.percentageDescription)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .monospacedDigit()
+                        .voltRowText()
                         .fixedSize()
                 }
 
@@ -63,18 +60,14 @@ struct UsageRowView: View {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 if let reset = window.resetsAt {
                     Label(resetDescription(reset, now: now), systemImage: "clock")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .monospacedDigit()
+                        .voltRowText()
                 }
 
                 Spacer(minLength: 6)
 
                 if let elapsed {
                     Text("\(percentString(elapsed)) elapsed")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .monospacedDigit()
+                        .voltRowText()
                         .fixedSize()
                 }
             }

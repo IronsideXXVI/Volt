@@ -135,6 +135,29 @@ extension SectionHeader where Accessory == EmptyView {
     }
 }
 
+// MARK: - Text styles (one canonical style per field type)
+
+extension View {
+    /// The "<Provider> plan usage limits" heading.
+    func voltTitle() -> some View { font(.system(size: 15, weight: .semibold)) }
+
+    /// A section heading (Weekly limits, Usage, Usage credits, Spend limit…).
+    func voltSectionHeader() -> some View { font(.system(size: 13, weight: .semibold)) }
+
+    /// The heading of a full-view state (connect, error, empty, syncing).
+    func voltStateTitle() -> some View { font(.system(size: 14, weight: .semibold)) }
+
+    /// A usage-row's primary text: name, percentage, reset, and elapsed.
+    func voltRowText() -> some View { font(.system(size: 12, weight: .semibold)).monospacedDigit() }
+
+    /// A key/value detail row's value (e.g. "$0.00", "Off").
+    func voltDetailValue() -> some View { font(.system(size: 11, weight: .semibold, design: .monospaced)) }
+
+    /// Secondary descriptive text: account/plan lines, subtitles, notices,
+    /// detail labels, and empty/edge messages.
+    func voltCaption() -> some View { font(.system(size: 11)).foregroundStyle(.secondary) }
+}
+
 extension View {
     /// A quiet card: subtle fill, hairline border, continuous corners.
     func voltCard(cornerRadius: CGFloat = 12, padding: CGFloat = 14) -> some View {

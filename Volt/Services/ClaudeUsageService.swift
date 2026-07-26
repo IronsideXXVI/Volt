@@ -75,12 +75,30 @@ enum ClaudeUsageNormalizer {
             ))
         }
 
+        let modelScoped = modelScopedLimits(from: root)
+        consumedKeys.insert("model_scoped")
+        weeklyWindows.append(contentsOf: modelScoped)
+
+        // Anthropic introduced this opaque key for the included Fable allocation on
+        // Max and premium-seat plans. Prefer the server-labeled model_scoped shape
+        // when available, but retain this compatibility path for the OAuth usage API.
+        consumedKeys.insert("seven_day_overage_included")
+        if let bucket = bucket(root["seven_day_overage_included"]) {
+            weeklyWindows.append(makeWindow(
+                bucket,
+                id: "claude-weekly-fable",
+                title: "Fable",
+                duration: 7 * 24 * 60 * 60,
+                sourceIdentifier: "seven_day_overage_included"
+            ))
+        }
+
         let scoped = scopedLimits(from: root["limits"])
         consumedKeys.insert("limits")
         weeklyWindows.append(contentsOf: scoped.weekly)
         featureWindows.append(contentsOf: scoped.other)
 
-        let scopedIdentities = Set<String>(scoped.weekly.compactMap { window -> String? in
+        let scopedIdentities = Set<String>(weeklyWindows.compactMap { window -> String? in
             guard window.isActive != false else { return nil }
             return window.sourceIdentifier?.lowercased()
         })
@@ -280,7 +298,7 @@ enum ClaudeUsageNormalizer {
 
         for (index, rawEntry) in limits.enumerated() {
             guard let entry = rawEntry as? [String: Any],
-                  let percent = flexibleDouble(entry["percent"]),
+                  let percent = utilization(from: entry),
                   percent.isFinite
             else {
                 continue
@@ -297,7 +315,14 @@ enum ClaudeUsageNormalizer {
             let identity = identityParts.isEmpty ? "limit-\(index)" : identityParts.joined(separator: "-")
             let generatedID = "claude-limit-\(slug(identity))"
             let isWeeklyScoped = kind == "weekly_scoped" && group == "weekly"
-            let id = isWeeklyScoped && isAllModels ? "claude-weekly-all-models" : generatedID
+            let id: String
+            if isWeeklyScoped, isAllModels {
+                id = "claude-weekly-all-models"
+            } else if isWeeklyScoped, let modelIdentity = modelIdentity(modelID: modelID, modelName: modelName) {
+                id = "claude-weekly-\(modelIdentity)"
+            } else {
+                id = generatedID
+            }
             guard seen.insert(id).inserted else { continue }
 
             let sourceIdentifier = [modelID, modelName, kind, group]
@@ -318,7 +343,7 @@ enum ClaudeUsageNormalizer {
                     title: title,
                     usedPercent: percent,
                     displayMode: .used,
-                    resetsAt: flexibleDate(entry["resets_at"]),
+                    resetsAt: resetDate(from: entry),
                     duration: 7 * 24 * 60 * 60,
                     sourceIdentifier: sourceIdentifier,
                     isActive: isActive
@@ -329,7 +354,7 @@ enum ClaudeUsageNormalizer {
                     title: modelTitle ?? scopedLimitTitle(kind: kind, group: group),
                     usedPercent: percent,
                     displayMode: .used,
-                    resetsAt: flexibleDate(entry["resets_at"]),
+                    resetsAt: resetDate(from: entry),
                     duration: duration(forGroup: group),
                     sourceIdentifier: sourceIdentifier.isEmpty ? identity : sourceIdentifier,
                     isActive: isActive
@@ -337,6 +362,49 @@ enum ClaudeUsageNormalizer {
             }
         }
         return (weekly, other)
+    }
+
+    private static func modelScopedLimits(from root: [String: Any]) -> [UsageWindow] {
+        let nestedRateLimits = root["rate_limits"] as? [String: Any]
+        let rawLimits = root["model_scoped"] as? [Any]
+            ?? nestedRateLimits?["model_scoped"] as? [Any]
+            ?? []
+
+        return rawLimits.enumerated().compactMap { index, rawEntry in
+            guard let entry = rawEntry as? [String: Any],
+                  let utilization = utilization(from: entry),
+                  utilization.isFinite
+            else {
+                return nil
+            }
+
+            let displayName = nonEmpty(
+                entry["display_name"] as? String
+                    ?? entry["displayName"] as? String
+                    ?? entry["name"] as? String
+            )
+            let modelID = nonEmpty(
+                entry["model_id"] as? String
+                    ?? entry["modelId"] as? String
+                    ?? entry["id"] as? String
+            )
+            let identity = modelIdentity(modelID: modelID, modelName: displayName)
+                ?? "model-\(index)"
+            let title = displayName ?? modelID.map(readableName) ?? "Model limit"
+
+            return UsageWindow(
+                id: "claude-weekly-\(identity)",
+                title: title,
+                usedPercent: utilization,
+                displayMode: .used,
+                resetsAt: resetDate(from: entry),
+                duration: 7 * 24 * 60 * 60,
+                sourceIdentifier: [modelID, displayName, "model_scoped"]
+                    .compactMap { $0 }
+                    .joined(separator: " "),
+                isActive: flexibleBool(entry["is_active"])
+            )
+        }
     }
 
     private static func scopedLimitTitle(kind: String?, group: String?) -> String {
@@ -425,14 +493,32 @@ enum ClaudeUsageNormalizer {
 
     private static func bucket(_ value: Any?) -> Bucket? {
         guard let dictionary = value as? [String: Any],
-              let utilization = flexibleDouble(dictionary["utilization"] ?? dictionary["percent"]),
+              let utilization = utilization(from: dictionary),
               utilization.isFinite
         else {
             return nil
         }
         return Bucket(
             utilization: utilization,
-            resetsAt: flexibleDate(dictionary["resets_at"] ?? dictionary["reset_at"])
+            resetsAt: resetDate(from: dictionary)
+        )
+    }
+
+    private static func utilization(from dictionary: [String: Any]) -> Double? {
+        flexibleDouble(
+            dictionary["utilization"]
+                ?? dictionary["percent"]
+                ?? dictionary["used_percentage"]
+                ?? dictionary["usedPercent"]
+        )
+    }
+
+    private static func resetDate(from dictionary: [String: Any]) -> Date? {
+        flexibleDate(
+            dictionary["resets_at"]
+                ?? dictionary["reset_at"]
+                ?? dictionary["resetsAt"]
+                ?? dictionary["resetAt"]
         )
     }
 
@@ -541,9 +627,50 @@ enum ClaudeUsageNormalizer {
         return nameSlug == "all-models" || idSlug == "all-models" || idSlug.hasSuffix("-all-models")
     }
 
+    private static func modelIdentity(modelID: String?, modelName: String?) -> String? {
+        let rawIdentity = nonEmpty(modelName) ?? nonEmpty(modelID)
+        guard let rawIdentity else { return nil }
+
+        let ignoredTokens = Set([
+            "claude",
+            "model",
+            "only",
+            "promotional",
+        ])
+        let tokens = slug(rawIdentity)
+            .split(separator: "-")
+            .map(String.init)
+            .filter { token in
+                !ignoredTokens.contains(token)
+                    && !token.allSatisfy(\.isNumber)
+            }
+        return nonEmpty(tokens.joined(separator: "-"))
+    }
+
     private static func deduplicated(_ windows: [UsageWindow]) -> [UsageWindow] {
-        var seen = Set<String>()
-        return windows.filter { seen.insert($0.id).inserted }
+        var orderedIDs: [String] = []
+        var preferredByID: [String: UsageWindow] = [:]
+
+        for window in windows {
+            guard let existing = preferredByID[window.id] else {
+                orderedIDs.append(window.id)
+                preferredByID[window.id] = window
+                continue
+            }
+            if activityPriority(window) > activityPriority(existing) {
+                preferredByID[window.id] = window
+            }
+        }
+
+        return orderedIDs.compactMap { preferredByID[$0] }
+    }
+
+    private static func activityPriority(_ window: UsageWindow) -> Int {
+        switch window.isActive {
+        case true: return 2
+        case nil: return 1
+        case false: return 0
+        }
     }
 
     private static func flexibleDouble(_ value: Any?) -> Double? {

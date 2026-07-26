@@ -233,6 +233,51 @@ final class ProviderUsagePresentationTests: XCTestCase {
         XCTAssertTrue(dashboard.detailSections.isEmpty)
     }
 
+    func testClaudeDashboardPrefersActiveIncludedFableBucket() throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let raw = ProviderUsageSnapshot(
+            provider: .anthropic,
+            account: nil,
+            plan: "Claude Max 20x",
+            sections: [UsageSection(
+                id: "claude-weekly-limits",
+                title: "Weekly limits",
+                windows: [
+                    UsageWindow(
+                        id: "claude-weekly-fable-legacy",
+                        title: "Fable only",
+                        usedPercent: 22,
+                        displayMode: .used,
+                        resetsAt: now.addingTimeInterval(86_400),
+                        duration: 7 * 24 * 60 * 60,
+                        sourceIdentifier: "Fable weekly_scoped",
+                        isActive: false
+                    ),
+                    UsageWindow(
+                        id: "claude-weekly-fable",
+                        title: "Fable",
+                        usedPercent: 23,
+                        displayMode: .used,
+                        resetsAt: now.addingTimeInterval(86_400),
+                        duration: 7 * 24 * 60 * 60,
+                        sourceIdentifier: "seven_day_overage_included"
+                    ),
+                ]
+            )],
+            detailSections: [],
+            notices: [],
+            updatedAt: now
+        )
+
+        let dashboard = raw.curatedForDashboard()
+        let fable = try XCTUnwrap(dashboard.windows.first)
+
+        XCTAssertEqual(dashboard.windows.count, 1)
+        XCTAssertEqual(fable.title, "Fable")
+        XCTAssertEqual(fable.usedPercent, 23, accuracy: 0.001)
+        XCTAssertNotEqual(fable.quotaState, .inactive)
+    }
+
     private func window(
         id: String,
         title: String,

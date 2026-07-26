@@ -1,0 +1,29 @@
+{
+  "five_hour": {
+    "utilization": 37,
+    "resets_at": "2026-07-26T18:00:00Z"
+  },
+  "seven_day": {
+    "utilization": 14,
+    "resets_at": "2026-08-01T15:59:00Z"
+  },
+  "seven_day_overage_included": {
+    "utilization": 22,
+    "resets_at": "2026-08-01T15:59:00Z"
+  },
+  "limits": [
+    {
+      "kind": "weekly_scoped",
+      "group": "weekly",
+      "percent": 22,
+      "resets_at": "2026-08-01T15:59:00Z",
+      "scope": {
+        "model": {
+          "id": null,
+          "display_name": "Fable"
+        }
+      },
+      "is_active": false
+    }
+  ]
+}

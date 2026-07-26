@@ -84,11 +84,18 @@ extension ProviderUsageSnapshot {
             Self.copy(window, id: "claude-weekly-all-models", title: "All models")
         }
 
-        let fable = sourceWindows.first(where: { window in
-            window.title.localizedCaseInsensitiveContains("fable")
-                || window.sourceIdentifier?.localizedCaseInsensitiveContains("fable") == true
+        let fableCandidates = sourceWindows.filter(Self.isFableWindow)
+        let fable = fableCandidates.max(by: { lhs, rhs in
+            Self.activityPriority(lhs) < Self.activityPriority(rhs)
         }).map { window in
             Self.copy(window, id: "claude-weekly-fable", title: "Fable")
+        }
+
+        let dynamicModelWindows = sourceWindows.filter { window in
+            window.sourceIdentifier?.localizedCaseInsensitiveContains("model_scoped") == true
+                && window.id != "claude-weekly-all-models"
+                && !Self.isFableWindow(window)
+                && window.isActive != false
         }
 
         var usageSections: [UsageSection] = []
@@ -100,7 +107,7 @@ extension ProviderUsageSnapshot {
             ))
         }
 
-        let weekly = [allModels, fable].compactMap { $0 }
+        let weekly = [allModels, fable].compactMap { $0 } + dynamicModelWindows
         if !weekly.isEmpty {
             usageSections.append(UsageSection(
                 id: "claude-weekly-limits",
@@ -202,5 +209,19 @@ extension ProviderUsageSnapshot {
     private static func isWeekly(_ duration: TimeInterval?) -> Bool {
         guard let duration else { return false }
         return abs(duration - 7 * 24 * 60 * 60) < 60 * 60
+    }
+
+    private static func activityPriority(_ window: UsageWindow) -> Int {
+        switch window.isActive {
+        case true: return 2
+        case nil: return 1
+        case false: return 0
+        }
+    }
+
+    nonisolated private static func isFableWindow(_ window: UsageWindow) -> Bool {
+        window.title.localizedCaseInsensitiveContains("fable")
+            || window.sourceIdentifier?.localizedCaseInsensitiveContains("fable") == true
+            || window.sourceIdentifier == "seven_day_overage_included"
     }
 }

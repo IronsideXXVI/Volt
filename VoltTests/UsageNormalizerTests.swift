@@ -243,6 +243,62 @@ final class UsageNormalizerTests: XCTestCase {
         XCTAssertEqual(extra.items.map(\.value), ["Off", "$0.00"])
     }
 
+    func testClaudeIncludedFableBucketReplacesInactiveLegacyScope() throws {
+        let snapshot = try ClaudeUsageNormalizer.snapshot(
+            from: fixture("claude-fable-included"),
+            account: nil,
+            plan: "Claude Max 20x"
+        )
+
+        let weekly = try XCTUnwrap(snapshot.sections.first(where: { $0.id == "claude-weekly-limits" }))
+        let fableWindows = weekly.windows.filter { $0.id == "claude-weekly-fable" }
+        let fable = try XCTUnwrap(fableWindows.first)
+
+        XCTAssertEqual(fableWindows.count, 1)
+        XCTAssertEqual(fable.title, "Fable")
+        XCTAssertEqual(fable.usedPercent, 22, accuracy: 0.001)
+        XCTAssertNotEqual(fable.quotaState, .inactive)
+        XCTAssertEqual(fable.sourceIdentifier, "seven_day_overage_included")
+    }
+
+    func testClaudeModelScopedShapeSupportsFutureServerNamedModels() throws {
+        let snapshot = try ClaudeUsageNormalizer.snapshot(
+            from: Data(#"""
+            {
+              "seven_day": {
+                "utilization": 18,
+                "resets_at": "2026-08-01T15:59:00Z"
+              },
+              "rate_limits": {
+                "model_scoped": [
+                  {
+                    "displayName": "Claude Nova 2 Preview",
+                    "used_percentage": 11,
+                    "resetsAt": "2026-08-01T15:59:00Z",
+                    "is_active": true
+                  }
+                ]
+              }
+            }
+            """#.utf8),
+            account: nil,
+            plan: nil
+        )
+
+        let future = try XCTUnwrap(snapshot.windows.first(where: {
+            $0.title == "Claude Nova 2 Preview"
+        }))
+        XCTAssertEqual(future.id, "claude-weekly-nova-preview")
+        XCTAssertEqual(future.usedPercent, 11, accuracy: 0.001)
+        XCTAssertEqual(future.quotaState, .normal)
+        XCTAssertTrue(future.sourceIdentifier?.contains("model_scoped") == true)
+
+        let dashboard = snapshot.curatedForDashboard()
+        XCTAssertTrue(dashboard.windows.contains(where: {
+            $0.title == "Claude Nova 2 Preview"
+        }))
+    }
+
     func testClaudeAuxiliaryEndpointsNormalizeIntoDetailRows() throws {
         let auxiliary = ClaudeUsageNormalizer.auxiliaryUsage(
             creditsData: try fixture("claude-prepaid-credits"),

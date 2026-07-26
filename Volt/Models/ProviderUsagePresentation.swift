@@ -92,10 +92,9 @@ extension ProviderUsageSnapshot {
         }
 
         let dynamicModelWindows = sourceWindows.filter { window in
-            window.sourceIdentifier?.localizedCaseInsensitiveContains("model_scoped") == true
+            Self.isDynamicWeeklyModelWindow(window)
                 && window.id != "claude-weekly-all-models"
                 && !Self.isFableWindow(window)
-                && window.isActive != false
         }
 
         var usageSections: [UsageSection] = []
@@ -223,5 +222,10 @@ extension ProviderUsageSnapshot {
         window.title.localizedCaseInsensitiveContains("fable")
             || window.sourceIdentifier?.localizedCaseInsensitiveContains("fable") == true
             || window.sourceIdentifier == "seven_day_overage_included"
+    }
+
+    nonisolated private static func isDynamicWeeklyModelWindow(_ window: UsageWindow) -> Bool {
+        window.sourceIdentifier?.localizedCaseInsensitiveContains("model_scoped") == true
+            || window.sourceIdentifier?.localizedCaseInsensitiveContains("weekly_scoped") == true
     }
 }

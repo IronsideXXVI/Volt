@@ -210,7 +210,8 @@ final class UsageNormalizerTests: XCTestCase {
         XCTAssertEqual(weekly.windows.filter { $0.title.lowercased().contains("sonnet") }.count, 1)
         XCTAssertTrue(weekly.windows.contains(where: { $0.title == "Claude Sonnet 4.5 only" }))
         let fable = try XCTUnwrap(weekly.windows.first(where: { $0.title == "Fable only" }))
-        XCTAssertEqual(fable.isActive, false)
+        XCTAssertNil(fable.isActive)
+        XCTAssertNotEqual(fable.quotaState, .inactive)
         XCTAssertFalse(snapshot.windows.contains(where: { $0.title == "All models only" }))
 
         let features = try XCTUnwrap(snapshot.sections.first(where: { $0.id == "claude-feature-limits" }))
@@ -219,7 +220,7 @@ final class UsageNormalizerTests: XCTestCase {
         XCTAssertTrue(features.windows.contains(where: { $0.title == "Future model" }))
     }
 
-    func testClaudeLimitsOnlyPayloadKeepsAllModelsAndMarksInactiveScopes() throws {
+    func testClaudeLimitsOnlyPayloadKeepsAllModelsWithoutPausingWeeklyScopes() throws {
         let snapshot = try ClaudeUsageNormalizer.snapshot(
             from: fixture("claude-limits-only"),
             account: nil,
@@ -230,9 +231,9 @@ final class UsageNormalizerTests: XCTestCase {
         XCTAssertEqual(weekly.windows.filter { $0.title == "All models" }.count, 1)
         XCTAssertTrue(weekly.windows.contains(where: { $0.title == "Sonnet only" && $0.usedPercent == 44 }))
 
-        let inactive = try XCTUnwrap(weekly.windows.first(where: { $0.title == "Claude Sonnet Preview only" }))
-        XCTAssertEqual(inactive.quotaState, .inactive)
-        XCTAssertEqual(inactive.statusDescription, "Inactive")
+        let scoped = try XCTUnwrap(weekly.windows.first(where: { $0.title == "Claude Sonnet Preview only" }))
+        XCTAssertNotEqual(scoped.quotaState, .inactive)
+        XCTAssertNil(scoped.statusDescription)
 
         let features = try XCTUnwrap(snapshot.sections.first(where: { $0.id == "claude-feature-limits" }))
         let routines = try XCTUnwrap(features.windows.first(where: { $0.title == "Daily Routines" }))
@@ -259,6 +260,26 @@ final class UsageNormalizerTests: XCTestCase {
         XCTAssertEqual(fable.usedPercent, 22, accuracy: 0.001)
         XCTAssertNotEqual(fable.quotaState, .inactive)
         XCTAssertEqual(fable.sourceIdentifier, "seven_day_overage_included")
+    }
+
+    func testClaudeSessionWeeklyScopesRemainUsableWhenRequestContextIsInactive() throws {
+        let snapshot = try ClaudeUsageNormalizer.snapshot(
+            from: fixture("claude-session-weekly-scoped"),
+            account: nil,
+            plan: "Claude Max 20x"
+        ).curatedForDashboard()
+
+        let weekly = try XCTUnwrap(snapshot.sections.first(where: { $0.id == "claude-weekly-limits" }))
+        XCTAssertEqual(weekly.windows.map(\.title), ["All models", "Fable", "Claude Nova Preview only"])
+
+        let fable = try XCTUnwrap(weekly.windows.first(where: { $0.title == "Fable" }))
+        XCTAssertEqual(fable.usedPercent, 27, accuracy: 0.001)
+        XCTAssertNotEqual(fable.quotaState, .inactive)
+        XCTAssertNil(fable.statusDescription)
+
+        let future = try XCTUnwrap(weekly.windows.first(where: { $0.title == "Claude Nova Preview only" }))
+        XCTAssertEqual(future.usedPercent, 6, accuracy: 0.001)
+        XCTAssertNotEqual(future.quotaState, .inactive)
     }
 
     func testClaudeModelScopedShapeSupportsFutureServerNamedModels() throws {

@@ -95,19 +95,17 @@ enum ClaudeUsageNormalizer {
 
         let scoped = scopedLimits(from: root["limits"])
         consumedKeys.insert("limits")
+        sessionWindows.append(contentsOf: scoped.session)
         weeklyWindows.append(contentsOf: scoped.weekly)
         featureWindows.append(contentsOf: scoped.other)
 
-        let scopedIdentities = Set<String>(weeklyWindows.compactMap { window -> String? in
-            guard window.isActive != false else { return nil }
-            return window.sourceIdentifier?.lowercased()
-        })
+        let scopedWindowIDs = Set(weeklyWindows.map(\.id))
         appendLegacyModelWindow(
             root: root,
             key: "seven_day_sonnet",
             title: "Sonnet only",
             modelToken: "sonnet",
-            scopedIdentities: scopedIdentities,
+            scopedWindowIDs: scopedWindowIDs,
             windows: &weeklyWindows,
             consumedKeys: &consumedKeys
         )
@@ -116,7 +114,7 @@ enum ClaudeUsageNormalizer {
             key: "seven_day_opus",
             title: "Opus only",
             modelToken: "opus",
-            scopedIdentities: scopedIdentities,
+            scopedWindowIDs: scopedWindowIDs,
             windows: &weeklyWindows,
             consumedKeys: &consumedKeys
         )
@@ -290,8 +288,11 @@ enum ClaudeUsageNormalizer {
         return base
     }
 
-    private static func scopedLimits(from value: Any?) -> (weekly: [UsageWindow], other: [UsageWindow]) {
-        guard let limits = value as? [Any] else { return ([], []) }
+    private static func scopedLimits(
+        from value: Any?
+    ) -> (session: [UsageWindow], weekly: [UsageWindow], other: [UsageWindow]) {
+        guard let limits = value as? [Any] else { return ([], [], []) }
+        var session: [UsageWindow] = []
         var weekly: [UsageWindow] = []
         var other: [UsageWindow] = []
         var seen = Set<String>()
@@ -310,15 +311,19 @@ enum ClaudeUsageNormalizer {
             let modelID = nonEmpty(model?["id"] as? String)
             let modelName = nonEmpty(model?["display_name"] as? String)
             let modelTitle = modelName ?? modelID.map(readableName)
-            let isAllModels = isAllModelsScope(modelID: modelID, modelName: modelName)
+            let isSession = kind == "session" || group == "session"
+            let isWeekly = group == "weekly" || kind?.hasPrefix("weekly") == true
+            let isAllModels = kind == "weekly_all"
+                || isAllModelsScope(modelID: modelID, modelName: modelName)
             let identityParts = [kind, group, modelID ?? modelName].compactMap { $0 }
             let identity = identityParts.isEmpty ? "limit-\(index)" : identityParts.joined(separator: "-")
             let generatedID = "claude-limit-\(slug(identity))"
-            let isWeeklyScoped = kind == "weekly_scoped" && group == "weekly"
             let id: String
-            if isWeeklyScoped, isAllModels {
+            if isSession {
+                id = "claude-session"
+            } else if isWeekly, isAllModels {
                 id = "claude-weekly-all-models"
-            } else if isWeeklyScoped, let modelIdentity = modelIdentity(modelID: modelID, modelName: modelName) {
+            } else if isWeekly, let modelIdentity = modelIdentity(modelID: modelID, modelName: modelName) {
                 id = "claude-weekly-\(modelIdentity)"
             } else {
                 id = generatedID
@@ -330,7 +335,21 @@ enum ClaudeUsageNormalizer {
                 .joined(separator: " ")
             let isActive = flexibleBool(entry["is_active"])
 
-            if isWeeklyScoped {
+            // The browser-session endpoint sets `is_active` according to whether
+            // a quota applies to the current request context. Claude's own usage
+            // dashboard still presents session and weekly trackers when it is
+            // false, so it must not be interpreted as quota availability.
+            if isSession {
+                session.append(UsageWindow(
+                    id: id,
+                    title: "Current session",
+                    usedPercent: percent,
+                    displayMode: .used,
+                    resetsAt: resetDate(from: entry),
+                    duration: 5 * 60 * 60,
+                    sourceIdentifier: sourceIdentifier.isEmpty ? "session" : sourceIdentifier
+                ))
+            } else if isWeekly {
                 let title: String
                 if isAllModels {
                     title = "All models"
@@ -345,8 +364,7 @@ enum ClaudeUsageNormalizer {
                     displayMode: .used,
                     resetsAt: resetDate(from: entry),
                     duration: 7 * 24 * 60 * 60,
-                    sourceIdentifier: sourceIdentifier,
-                    isActive: isActive
+                    sourceIdentifier: sourceIdentifier
                 ))
             } else {
                 other.append(UsageWindow(
@@ -361,7 +379,7 @@ enum ClaudeUsageNormalizer {
                 ))
             }
         }
-        return (weekly, other)
+        return (session, weekly, other)
     }
 
     private static func modelScopedLimits(from root: [String: Any]) -> [UsageWindow] {
@@ -401,8 +419,7 @@ enum ClaudeUsageNormalizer {
                 duration: 7 * 24 * 60 * 60,
                 sourceIdentifier: [modelID, displayName, "model_scoped"]
                     .compactMap { $0 }
-                    .joined(separator: " "),
-                isActive: flexibleBool(entry["is_active"])
+                    .joined(separator: " ")
             )
         }
     }
@@ -435,12 +452,12 @@ enum ClaudeUsageNormalizer {
         key: String,
         title: String,
         modelToken: String,
-        scopedIdentities: Set<String>,
+        scopedWindowIDs: Set<String>,
         windows: inout [UsageWindow],
         consumedKeys: inout Set<String>
     ) {
         consumedKeys.insert(key)
-        let hasScopedReplacement = scopedIdentities.contains { $0.contains(modelToken) }
+        let hasScopedReplacement = scopedWindowIDs.contains("claude-weekly-\(modelToken)")
         guard !hasScopedReplacement, let bucket = bucket(root[key]) else { return }
         windows.append(makeWindow(
             bucket,

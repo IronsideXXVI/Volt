@@ -1,0 +1,55 @@
+{
+  "five_hour": {
+    "utilization": 35,
+    "resets_at": "2026-08-02T18:00:00Z"
+  },
+  "seven_day": {
+    "utilization": 12,
+    "resets_at": "2026-08-08T16:00:00Z"
+  },
+  "limits": [
+    {
+      "kind": "session",
+      "group": "session",
+      "percent": 35,
+      "resets_at": "2026-08-02T18:00:00Z",
+      "scope": null,
+      "is_active": true
+    },
+    {
+      "kind": "weekly_all",
+      "group": "weekly",
+      "percent": 12,
+      "resets_at": "2026-08-08T16:00:00Z",
+      "scope": null,
+      "is_active": false
+    },
+    {
+      "kind": "weekly_scoped",
+      "group": "weekly",
+      "percent": 27,
+      "resets_at": "2026-08-08T16:00:00Z",
+      "scope": {
+        "model": {
+          "id": null,
+          "display_name": "Fable"
+        },
+        "surface": null
+      },
+      "is_active": false
+    },
+    {
+      "kind": "weekly_scoped",
+      "group": "weekly",
+      "percent": 6,
+      "resets_at": "2026-08-08T16:00:00Z",
+      "scope": {
+        "model": {
+          "id": "claude-nova-preview",
+          "display_name": "Claude Nova Preview"
+        }
+      },
+      "is_active": false
+    }
+  ]
+}

@@ -8,6 +8,7 @@ Volt is a native macOS menu-bar app for checking AI plan usage without leaving y
   - Current-session and weekly usage
   - Dynamic model-scoped limits from the modern `limits[]` and `model_scoped` schemas
   - Included Fable usage from Anthropic's `seven_day_overage_included` limit type
+  - Browser-session weekly limits remain visible when Claude marks them inactive for the current request context
   - Legacy Sonnet, Opus, Claude Design, Cowork, OAuth apps, and routine limits when returned
   - Extra usage, prepaid balance, auto-reload, purchase reset date, and daily routine-run budget
 - **OpenAI / Codex**

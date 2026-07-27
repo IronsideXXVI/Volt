@@ -18,11 +18,13 @@ Volt is a native macOS menu-bar app for checking AI plan usage without leaving y
 
 Claude presents **percent used**, matching Anthropic. OpenAI presents **percent remaining**, matching the Codex usage dashboard. The top bar consistently shows **quota consumed**, so a limit with 10% remaining is 90% full and 10% empty. When reset timing is known, the neutral lower bar shows how much of that quota window has elapsed, making usage pace easy to compare with time. Warning and critical colors are based on consumption, not the provider’s label direction.
 
-Volt has no Dock icon or main application window. Click the Volt logo in the macOS menu bar to switch providers, refresh usage, or open Settings.
+Volt has no Dock icon or main application window. Add as many Claude and OpenAI accounts as you need; each account gets a named tab in the menu drawer. Click the Volt logo in the macOS menu bar to switch accounts, refresh usage, or open Settings.
 
 ## Credentials
 
 Credentials are stored in the macOS login Keychain. Volt talks directly to each provider and does not proxy, log, or upload credentials.
+
+Use **Add Account** in either provider's Settings pane to create another tab, then import that account's credentials and give the tab a recognizable name. Existing single-account credentials are migrated automatically the first time a multi-account build opens.
 
 ### Claude
 
@@ -69,7 +71,7 @@ The app uses [Sparkle](https://sparkle-project.org/) for automatic and manual up
 
 ## Core tests
 
-Provider payload parsing and normalization are isolated in a small Swift package so they can be tested without launching the menu-bar app:
+Provider payload parsing, normalization, and account-profile persistence are isolated in a small Swift package so they can be tested without launching the menu-bar app:
 
 ```bash
 swift test

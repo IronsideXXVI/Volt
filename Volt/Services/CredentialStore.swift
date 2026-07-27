@@ -17,31 +17,56 @@ enum CredentialStoreError: LocalizedError {
 
 enum CredentialStore {
     private static let service = "com.IronsideXXVI.Volt.credentials"
-    private static let claudeAccount = "anthropic"
-    private static let openAIAccount = "openai"
+    private static let legacyClaudeAccount = "anthropic"
+    private static let legacyOpenAIAccount = "openai"
 
-    static func loadClaude() throws -> ClaudeCredentials? {
-        try load(ClaudeCredentials.self, account: claudeAccount)
+    static func loadClaude(accountID: UUID) throws -> ClaudeCredentials? {
+        try load(ClaudeCredentials.self, account: keychainAccount(provider: .anthropic, accountID: accountID))
     }
 
-    static func saveClaude(_ credentials: ClaudeCredentials) throws {
-        try save(credentials, account: claudeAccount)
+    static func saveClaude(_ credentials: ClaudeCredentials, accountID: UUID) throws {
+        try save(credentials, account: keychainAccount(provider: .anthropic, accountID: accountID))
     }
 
-    static func deleteClaude() throws {
-        try delete(account: claudeAccount)
+    static func deleteClaude(accountID: UUID) throws {
+        try delete(account: keychainAccount(provider: .anthropic, accountID: accountID))
     }
 
-    static func loadOpenAI() throws -> OpenAICredentials? {
-        try load(OpenAICredentials.self, account: openAIAccount)
+    static func loadOpenAI(accountID: UUID) throws -> OpenAICredentials? {
+        try load(OpenAICredentials.self, account: keychainAccount(provider: .openAI, accountID: accountID))
     }
 
-    static func saveOpenAI(_ credentials: OpenAICredentials) throws {
-        try save(credentials, account: openAIAccount)
+    static func saveOpenAI(_ credentials: OpenAICredentials, accountID: UUID) throws {
+        try save(credentials, account: keychainAccount(provider: .openAI, accountID: accountID))
     }
 
-    static func deleteOpenAI() throws {
-        try delete(account: openAIAccount)
+    static func deleteOpenAI(accountID: UUID) throws {
+        try delete(account: keychainAccount(provider: .openAI, accountID: accountID))
+    }
+
+    /// Moves the pre-multi-account Keychain entries into the first profile for
+    /// each provider. The copy happens before the legacy item is removed, so an
+    /// interrupted migration never loses credentials.
+    static func migrateLegacyCredentials(to accounts: [ProviderAccount]) throws {
+        if let target = accounts.first(where: { $0.provider == .anthropic }),
+           let credentials = try load(ClaudeCredentials.self, account: legacyClaudeAccount) {
+            if try loadClaude(accountID: target.id) == nil {
+                try saveClaude(credentials, accountID: target.id)
+            }
+            try delete(account: legacyClaudeAccount)
+        }
+
+        if let target = accounts.first(where: { $0.provider == .openAI }),
+           let credentials = try load(OpenAICredentials.self, account: legacyOpenAIAccount) {
+            if try loadOpenAI(accountID: target.id) == nil {
+                try saveOpenAI(credentials, accountID: target.id)
+            }
+            try delete(account: legacyOpenAIAccount)
+        }
+    }
+
+    private static func keychainAccount(provider: AIProvider, accountID: UUID) -> String {
+        "\(provider.rawValue).\(accountID.uuidString.lowercased())"
     }
 
     private static func load<Value: Decodable>(_ type: Value.Type, account: String) throws -> Value? {

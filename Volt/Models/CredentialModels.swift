@@ -1,5 +1,22 @@
 import Foundation
 
+struct ProviderAccount: Codable, Equatable, Hashable, Identifiable, Sendable {
+    let id: UUID
+    let provider: AIProvider
+    var name: String
+
+    init(id: UUID = UUID(), provider: AIProvider, name: String) {
+        self.id = id
+        self.provider = provider
+        self.name = name
+    }
+
+    var displayName: String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? provider.displayName : trimmed
+    }
+}
+
 struct ClaudeCredentials: Codable, Equatable, Sendable {
     var organizationID: String
     var sessionKey: String

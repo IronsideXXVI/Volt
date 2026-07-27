@@ -352,27 +352,28 @@ struct ContentView: View {
 
     private func noticeView(_ notice: UsageNotice) -> some View {
         let isInfo = notice.kind == .information
-        let accent: Color = notice.kind == .error ? .red : (notice.kind == .warning ? .orange : .secondary)
+        let isError = notice.kind == .error
+        let foreground: Color = isError ? .red : .secondary
         let symbol = isInfo ? "info.circle.fill" : "exclamationmark.triangle.fill"
         return HStack(alignment: .top, spacing: 8) {
             Image(systemName: symbol)
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(accent)
+                .foregroundStyle(foreground)
                 .padding(.top, 1)
             Text(styledMarkdown(
                 notice.message,
-                base: isInfo ? .secondary : accent,
-                lead: isInfo ? .primary : accent
+                base: foreground,
+                lead: isError ? .red : .primary
             ))
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(isInfo ? VoltTheme.card : accent.opacity(0.09),
+        .background(isError ? Color.red.opacity(0.09) : VoltTheme.card,
                     in: RoundedRectangle(cornerRadius: 9, style: .continuous))
         .overlay {
-            if isInfo {
+            if !isError {
                 RoundedRectangle(cornerRadius: 9, style: .continuous)
                     .strokeBorder(VoltTheme.hairline, lineWidth: 0.5)
             }

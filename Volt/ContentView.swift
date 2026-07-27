@@ -16,7 +16,7 @@ struct ContentView: View {
         VStack(spacing: 0) {
             header
 
-            providerSwitcher(selection: $store.selectedProvider)
+            accountSwitcher(selection: $store.selectedAccountID)
                 .padding(.horizontal, 14)
                 .padding(.bottom, 12)
 
@@ -46,7 +46,7 @@ struct ContentView: View {
         // Fetch only when the menu opens. An unstructured Task is used (rather
         // than .task(id:)) so the fetch runs to completion and is not cancelled
         // by the view re-renders that happen while the popover is open.
-        // Switching provider tabs does not fetch, and there is no background
+        // Switching account tabs does not fetch, and there is no background
         // polling; the refresh button is the only other trigger.
         .onAppear {
             Task { await store.refreshOnOpen() }
@@ -83,47 +83,55 @@ struct ContentView: View {
         .padding(.bottom, 11)
     }
 
-    // MARK: Provider switcher
+    // MARK: Account switcher
 
-    private func providerSwitcher(selection: Binding<AIProvider>) -> some View {
-        HStack(spacing: 3) {
-            ForEach(store.providerOrder) { provider in
-                let isSelected = selection.wrappedValue == provider
-                Button {
-                    withAnimation(.easeOut(duration: 0.16)) {
-                        selection.wrappedValue = provider
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(provider.logoAsset)
-                            .renderingMode(.template)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 15, height: 15)
-                        Text(provider.displayName)
-                            .voltTabLabel(selected: isSelected)
-                    }
-                    .foregroundStyle(isSelected ? .primary : .secondary)
-                    .padding(.horizontal, 11)
-                    .frame(maxWidth: .infinity, minHeight: 32)
-                    .background {
-                        if isSelected {
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(VoltTheme.cardHover)
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .strokeBorder(VoltTheme.hairline, lineWidth: 0.5)
-                                }
+    private func accountSwitcher(selection: Binding<UUID>) -> some View {
+        let visibleTabCount = CGFloat(min(max(store.accounts.count, 1), 3))
+        let tabWidth = (326 - (visibleTabCount - 1) * 3) / visibleTabCount
+
+        return ScrollView(.horizontal) {
+            HStack(spacing: 3) {
+                ForEach(store.accounts) { account in
+                    let isSelected = selection.wrappedValue == account.id
+                    Button {
+                        withAnimation(.easeOut(duration: 0.16)) {
+                            selection.wrappedValue = account.id
                         }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(account.provider.logoAsset)
+                                .renderingMode(.template)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 15, height: 15)
+                            Text(account.displayName)
+                                .voltTabLabel(selected: isSelected)
+                                .lineLimit(1)
+                        }
+                        .foregroundStyle(isSelected ? .primary : .secondary)
+                        .padding(.horizontal, 11)
+                        .frame(width: tabWidth)
+                        .frame(minHeight: 32)
+                        .background {
+                            if isSelected {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(VoltTheme.cardHover)
+                                    .overlay {
+                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                            .strokeBorder(VoltTheme.hairline, lineWidth: 0.5)
+                                    }
+                            }
+                        }
+                        .contentShape(Rectangle())
                     }
-                    .contentShape(Rectangle())
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Show \(account.displayName) usage")
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Show \(provider.displayName) usage")
-                .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
+            .padding(3)
         }
-        .padding(3)
+        .scrollIndicators(.hidden)
         .background(VoltTheme.card, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
     }
 
@@ -131,16 +139,16 @@ struct ContentView: View {
 
     @ViewBuilder
     private var providerContent: some View {
-        let provider = store.selectedProvider
+        let account = store.selectedAccount
 
-        if let snapshot = store.snapshot(for: provider) {
-            snapshotView(snapshot)
-        } else if store.isLoading(provider) {
+        if let snapshot = store.snapshot(for: account.id) {
+            snapshotView(snapshot, accountID: account.id)
+        } else if store.isLoading(account.id) {
             loadingView
-        } else if !store.isConfigured(provider) {
-            unconfiguredView(provider)
-        } else if let error = store.error(for: provider) {
-            errorView(error, provider: provider)
+        } else if !store.isConfigured(account.id) {
+            unconfiguredView(account)
+        } else if let error = store.error(for: account.id) {
+            errorView(error, account: account)
         } else {
             loadingView
         }
@@ -148,7 +156,7 @@ struct ContentView: View {
 
     // MARK: Snapshot
 
-    private func snapshotView(_ snapshot: ProviderUsageSnapshot) -> some View {
+    private func snapshotView(_ snapshot: ProviderUsageSnapshot, accountID: UUID) -> some View {
         let boostNotices = snapshot.notices.filter { $0.id.hasPrefix("claude-boost-") }
         let otherNotices = snapshot.notices.filter { !$0.id.hasPrefix("claude-boost-") }
         let isClaude = snapshot.provider == .anthropic
@@ -174,7 +182,7 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            if let error = store.error(for: snapshot.provider) {
+            if let error = store.error(for: accountID) {
                 banner(error, color: .orange, symbol: "exclamationmark.triangle.fill", prefix: "Showing the last update. ")
             }
 
@@ -395,12 +403,13 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, minHeight: 240)
     }
 
-    private func unconfiguredView(_ provider: AIProvider) -> some View {
-        VStack(spacing: 14) {
+    private func unconfiguredView(_ account: ProviderAccount) -> some View {
+        let provider = account.provider
+        return VStack(spacing: 14) {
             VoltGlyph(symbol: "key.fill", tint: provider.tint, size: 46)
 
             VStack(spacing: 5) {
-                Text("Connect \(provider.displayName)")
+                Text("Connect \(account.displayName)")
                     .voltStateTitle()
                 Text(configurationInstructions(for: provider))
                     .voltCaption()
@@ -409,7 +418,7 @@ struct ContentView: View {
             }
 
             Button(action: showSettings) {
-                Text("Set up \(provider.displayName)")
+                Text("Set up \(account.displayName)")
                     .frame(minWidth: 120)
             }
             .buttonStyle(.borderedProminent)
@@ -424,12 +433,13 @@ struct ContentView: View {
         .padding(.vertical, 20)
     }
 
-    private func errorView(_ message: String, provider: AIProvider) -> some View {
-        VStack(spacing: 12) {
+    private func errorView(_ message: String, account: ProviderAccount) -> some View {
+        let provider = account.provider
+        return VStack(spacing: 12) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 24))
                 .foregroundStyle(.orange)
-            Text("Couldn't load \(provider.displayName)")
+            Text("Couldn't load \(account.displayName)")
                 .voltStateTitle()
             Text(message)
                 .voltCaption()
@@ -437,7 +447,7 @@ struct ContentView: View {
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 8) {
                 Button("Try Again") {
-                    Task { await store.refresh(provider) }
+                    Task { await store.refresh(account.id) }
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(provider.tint)
@@ -457,10 +467,10 @@ struct ContentView: View {
         TimelineView(.periodic(from: .now, by: 30)) { timeline in
             HStack(spacing: 8) {
                 Group {
-                    if let updatedAt = store.snapshot(for: store.selectedProvider)?.updatedAt {
+                    if let updatedAt = store.snapshot(for: store.selectedAccountID)?.updatedAt {
                         Text(updatedDescription(updatedAt, now: timeline.date))
                     } else {
-                        Text(store.selectedProvider.companyName)
+                        Text(store.selectedAccount.provider.companyName)
                     }
                 }
                 .foregroundStyle(.secondary)
@@ -470,7 +480,7 @@ struct ContentView: View {
                 footerButton(symbol: "arrow.clockwise", help: "Refresh usage") {
                     Task { await store.refreshSelected() }
                 }
-                .disabled(store.isLoading(store.selectedProvider) || !store.isConfigured(store.selectedProvider))
+                .disabled(store.isLoading(store.selectedAccountID) || !store.isConfigured(store.selectedAccountID))
                 .keyboardShortcut("r", modifiers: .command)
 
                 Button(action: showSettings) {

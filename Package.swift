@@ -17,8 +17,7 @@ let package = Package(
                 "Assets.xcassets",
                 "ContentView.swift",
                 "Info.plist",
-                "Services/CredentialStore.swift",
-                "ViewModels",
+                "ViewModels/UpdateController.swift",
                 "Views",
                 "Volt.entitlements",
                 "VoltApp.swift",
@@ -28,7 +27,9 @@ let package = Package(
                 "Models/ProviderUsagePresentation.swift",
                 "Models/UsageModels.swift",
                 "Services/ClaudeUsageService.swift",
+                "Services/CredentialStore.swift",
                 "Services/OpenAIUsageService.swift",
+                "ViewModels/UsageStore.swift",
             ]
         ),
         .testTarget(

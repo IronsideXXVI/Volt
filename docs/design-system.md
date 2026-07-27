@@ -86,6 +86,9 @@ Rules:
     with the `lead` color; the rest uses `base`. Do **not** bold it — emphasis
     is conveyed by color, driven by the API's own Markdown so future messages
     stay accurate.
+- Quota and plan-limit notices use the standard neutral `VoltTheme.card`
+  surface, `VoltTheme.hairline` border, and secondary text/icon color. Reserve
+  semantic red styling for actual errors.
 - The Claude boost/promotion banner is parsed generically from the org
   bootstrap `org_growthbook.features` (locale → Markdown), never by hardcoded
   feature id. It sits under **Weekly limits**, with "Learn more about usage

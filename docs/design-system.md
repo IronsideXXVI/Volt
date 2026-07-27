@@ -20,7 +20,7 @@ Every text element uses exactly one of these `View` modifiers. Do not use
 | `voltStateTitle()` | 14 semibold | Full-view state headings: connect / error / empty / syncing |
 | `voltHeaderTitle()` | 13 semibold | The app wordmark in the top bar |
 | `voltSectionHeader()` | 13 semibold | Section headings: Weekly limits, Usage, Usage credits, Spend limit, Usage limit resets |
-| `voltTabLabel(selected:)` | 13, semibold+primary (selected) / medium+secondary | Provider switcher tab labels |
+| `voltTabLabel(selected:)` | 13, semibold+primary (selected) / medium+secondary | Account switcher tab labels |
 | `voltRowText()` | 12 semibold, monospaced digits | A usage row's name, "X% used", "Resets …", "X% elapsed" |
 | `voltFooterText()` | 12 medium | Footer status text + control glyphs |
 | `voltCaption()` | 11, **secondary** | Account/plan lines, section & credit subtitles, notices, detail-row labels, empty/edge messages |
@@ -71,10 +71,10 @@ Rules:
 - A usage row is: name + percentage (top), the two stacked bars (usage over
   time), then metadata (reset + elapsed). Both bars are equal height for
   easy comparison.
-- Provider identity is shown **once** (the switcher). Do not repeat it in a
+- Provider identity is shown **once** (the switcher logo). Do not repeat it in a
   hero/header card.
-- Each switcher tab shows the provider's **monochrome logo** to the left of its
-  name. Logos are imported as **template images** (`template-rendering-intent`)
+- Each switcher tab shows the provider's **monochrome logo** to the left of the
+  account's name. Logos are imported as **template images** (`template-rendering-intent`)
   and tinted to the tab's label color (primary when selected, secondary when
   not) so they adapt to light/dark — never a per-provider brand color.
 
@@ -109,18 +109,18 @@ tokens and the same one-accent restraint**. It is 700×560 with a 190pt
 - **One accent** throughout: `primary` for connected/ready/info/success, the
   "Recommended"/"Credential ready" chips, and the page tint (`.tint`) on every
   pane including Updates; `.orange` for errors. No green anywhere.
-- **General → Dashboard order**: providers are listed as drag-to-reorder rows
-  (grip handle + `VoltLogoGlyph` + name) via `.draggable`/`.dropDestination`.
-  The order is persisted on `UsageStore.providerOrder` and drives the popover
-  switcher's tab order. There is no separate "default provider" — the order is
-  the single source of arrangement.
+- **General → Dashboard order**: account tabs are listed as drag-to-reorder rows
+  (grip handle + `VoltLogoGlyph` + account name) via
+  `.draggable`/`.dropDestination`. The order is persisted on
+  `UsageStore.accounts` and drives the popover switcher's tab order. Every
+  Claude or OpenAI account gets its own tab; the first tab is the default.
 
 ## Fetch behavior
 
 - Usage is fetched **only** when the menu opens (an unstructured `Task` in
   `onAppear`, so it isn't cancelled by re-renders) or when the refresh button
   is clicked. **No background polling. No fetch on tab switch.** Opening the
-  menu refreshes every configured provider once.
+  menu refreshes every configured account once.
 
 ## Adding a new provider tab (checklist)
 

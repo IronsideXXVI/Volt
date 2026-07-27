@@ -54,6 +54,10 @@ struct SettingsView: View {
     @EnvironmentObject private var updates: UpdateController
 
     @State private var selectedPane = SettingsPane.general
+    @State private var selectedClaudeAccountID: UUID?
+    @State private var selectedOpenAIAccountID: UUID?
+    @State private var claudeAccountName = ""
+    @State private var openAIAccountName = ""
     @State private var organizationID = ""
     @State private var claudeSessionKey = ""
     @State private var claudeOAuthAccessToken = ""
@@ -69,10 +73,12 @@ struct SettingsView: View {
     @State private var openAIAccountID = ""
     @State private var openAILastRefresh: Date?
 
-    @State private var statuses: [AIProvider: SettingsStatus] = [:]
-    @State private var testingProviders: Set<AIProvider> = []
-    @State private var dirtyProviders: Set<AIProvider> = []
+    @State private var statuses: [UUID: SettingsStatus] = [:]
+    @State private var testingAccounts: Set<UUID> = []
+    @State private var dirtyAccounts: Set<UUID> = []
     @State private var didLoadCredentials = false
+    @State private var savedClaudeAccountName = ""
+    @State private var savedOpenAIAccountName = ""
     @State private var savedClaudeCredentials = ClaudeCredentials()
     @State private var savedOpenAICredentials = OpenAICredentials(
         accessToken: "",
@@ -81,8 +87,9 @@ struct SettingsView: View {
         accountID: "",
         lastRefresh: nil
     )
-    @State private var providerToDisconnect: AIProvider?
-    @State private var dropTargetProvider: AIProvider?
+    @State private var accountToDisconnect: UUID?
+    @State private var accountToRemove: UUID?
+    @State private var dropTargetAccount: UUID?
 
     /// One accent everywhere — the Volt magenta — including Updates.
     private var paneTint: Color { VoltTheme.primary }
@@ -97,16 +104,44 @@ struct SettingsView: View {
         .tint(paneTint)
         .onAppear(perform: loadCredentials)
         .onChange(of: draftClaudeCredentials) { _, credentials in
-            updateDirtyState(.anthropic, isDirty: credentials != savedClaudeCredentials)
+            updateDirtyState(
+                selectedClaudeAccountID,
+                isDirty: credentials != savedClaudeCredentials
+                    || normalizedName(claudeAccountName) != savedClaudeAccountName
+            )
         }
         .onChange(of: draftOpenAICredentials) { _, credentials in
-            updateDirtyState(.openAI, isDirty: credentials != savedOpenAICredentials)
+            updateDirtyState(
+                selectedOpenAIAccountID,
+                isDirty: credentials != savedOpenAICredentials
+                    || normalizedName(openAIAccountName) != savedOpenAIAccountName
+            )
+        }
+        .onChange(of: claudeAccountName) { _, name in
+            updateDirtyState(
+                selectedClaudeAccountID,
+                isDirty: draftClaudeCredentials != savedClaudeCredentials
+                    || normalizedName(name) != savedClaudeAccountName
+            )
+        }
+        .onChange(of: openAIAccountName) { _, name in
+            updateDirtyState(
+                selectedOpenAIAccountID,
+                isDirty: draftOpenAICredentials != savedOpenAICredentials
+                    || normalizedName(name) != savedOpenAIAccountName
+            )
+        }
+        .onChange(of: selectedClaudeAccountID) {
+            loadClaudeCredentials()
+        }
+        .onChange(of: selectedOpenAIAccountID) {
+            loadOpenAICredentials()
         }
         .confirmationDialog(
-            "Disconnect \(providerToDisconnect?.displayName ?? "provider")?",
+            "Disconnect \(accountToDisconnect.flatMap(store.account(for:))?.displayName ?? "account")?",
             isPresented: Binding(
-                get: { providerToDisconnect != nil },
-                set: { if !$0 { providerToDisconnect = nil } }
+                get: { accountToDisconnect != nil },
+                set: { if !$0 { accountToDisconnect = nil } }
             ),
             titleVisibility: .visible
         ) {
@@ -114,10 +149,27 @@ struct SettingsView: View {
                 disconnectSelectedProvider()
             }
             Button("Cancel", role: .cancel) {
-                providerToDisconnect = nil
+                accountToDisconnect = nil
             }
         } message: {
-            Text("Volt will remove the saved credentials and cached usage for this provider.")
+            Text("Volt will remove this account's saved credentials and cached usage.")
+        }
+        .confirmationDialog(
+            "Remove \(accountToRemove.flatMap(store.account(for:))?.displayName ?? "account")?",
+            isPresented: Binding(
+                get: { accountToRemove != nil },
+                set: { if !$0 { accountToRemove = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Remove Account", role: .destructive) {
+                removeSelectedAccount()
+            }
+            Button("Cancel", role: .cancel) {
+                accountToRemove = nil
+            }
+        } message: {
+            Text("Volt will remove this tab, its credentials, and its cached usage.")
         }
     }
 
@@ -222,10 +274,10 @@ struct SettingsView: View {
     private var generalPane: some View {
         settingsPage(title: "General", subtitle: "Dashboard behavior and local data handling") {
             VStack(alignment: .leading, spacing: 12) {
-                SectionHeader("Dashboard order", detail: "Drag to set the order providers appear in the menu.")
+                SectionHeader("Dashboard order", detail: "Drag to set the order account tabs appear in the menu.")
                 VStack(spacing: 8) {
-                    ForEach(store.providerOrder) { provider in
-                        providerOrderRow(provider)
+                    ForEach(store.accounts) { account in
+                        accountOrderRow(account)
                     }
                 }
             }
@@ -370,15 +422,22 @@ struct SettingsView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    connectionStatusCard(for: provider)
+                    accountManagementCard(for: provider)
+                    if let account = selectedAccount(for: provider) {
+                        connectionStatusCard(for: account)
+                    }
                     content()
-                    statusBanner(for: provider)
+                    if let account = selectedAccount(for: provider) {
+                        statusBanner(for: account)
+                    }
                 }
                 .padding(20)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
 
-            actionFooter(for: provider, save: save)
+            if let account = selectedAccount(for: provider) {
+                actionFooter(for: account, save: save)
+            }
         }
     }
 
@@ -417,15 +476,59 @@ struct SettingsView: View {
 
     // MARK: Provider page pieces
 
-    private func connectionStatusCard(for provider: AIProvider) -> some View {
-        HStack(spacing: 12) {
+    private func accountManagementCard(for provider: AIProvider) -> some View {
+        let providerAccounts = store.accounts(for: provider)
+        let selection = accountSelectionBinding(for: provider)
+        let isDirty = dirtyAccounts.contains(selection.wrappedValue)
+        let isBusy = isDirty || testingAccounts.contains(selection.wrappedValue)
+
+        return VStack(alignment: .leading, spacing: 11) {
+            SectionHeader("Account tab", detail: "Each account appears as its own tab in the Volt drawer.")
+
+            HStack(spacing: 8) {
+                Picker("Account", selection: selection) {
+                    ForEach(providerAccounts) { account in
+                        Text(account.displayName).tag(account.id)
+                    }
+                }
+                .labelsHidden()
+                .disabled(isBusy)
+
+                Button {
+                    addAccount(provider)
+                } label: {
+                    Label("Add Account", systemImage: "plus")
+                }
+                .disabled(isBusy)
+            }
+
+            TextField("Tab name", text: accountNameBinding(for: provider))
+                .textFieldStyle(.roundedBorder)
+
+            if isDirty {
+                HStack {
+                    Text("Save or discard changes before switching accounts.")
+                        .voltCaption()
+                    Spacer()
+                    Button("Discard Changes") {
+                        discardChanges(for: provider)
+                    }
+                }
+            }
+        }
+        .voltCard()
+    }
+
+    private func connectionStatusCard(for account: ProviderAccount) -> some View {
+        let provider = account.provider
+        return HStack(spacing: 12) {
             VoltLogoGlyph(asset: provider.logoAsset, tint: provider.tint, size: 36)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(connectionTitle(for: provider))
+                Text(connectionTitle(for: account))
                     .voltControlLabel()
-                    .foregroundStyle(connectionColor(for: provider))
-                Text(connectionDetail(for: provider))
+                    .foregroundStyle(connectionColor(for: account))
+                Text(connectionDetail(for: account))
                     .voltCaption()
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
@@ -480,8 +583,9 @@ struct SettingsView: View {
         }
     }
 
-    private func providerOrderRow(_ provider: AIProvider) -> some View {
-        let isDropTarget = dropTargetProvider == provider
+    private func accountOrderRow(_ account: ProviderAccount) -> some View {
+        let provider = account.provider
+        let isDropTarget = dropTargetAccount == account.id
 
         return HStack(spacing: 11) {
             Image(systemName: "line.3.horizontal")
@@ -490,7 +594,7 @@ struct SettingsView: View {
                 .accessibilityHidden(true)
             VoltLogoGlyph(asset: provider.logoAsset, tint: provider.tint, size: 30)
             VStack(alignment: .leading, spacing: 1) {
-                Text(provider.displayName)
+                Text(account.displayName)
                     .voltControlLabel()
                 Text(provider.companyName)
                     .voltCaption()
@@ -508,19 +612,19 @@ struct SettingsView: View {
                 )
         }
         .contentShape(Rectangle())
-        .draggable(provider)
-        .dropDestination(for: AIProvider.self) { items, _ in
-            dropTargetProvider = nil
-            guard let dragged = items.first else { return false }
+        .draggable(account.id.uuidString)
+        .dropDestination(for: String.self) { items, _ in
+            dropTargetAccount = nil
+            guard let rawID = items.first, let draggedID = UUID(uuidString: rawID) else { return false }
             withAnimation(.easeOut(duration: 0.18)) {
-                store.reorderProvider(dragged, toSlotOf: provider)
+                store.reorderAccount(draggedID, toSlotOf: account.id)
             }
             return true
         } isTargeted: { targeted in
-            dropTargetProvider = targeted ? provider : (dropTargetProvider == provider ? nil : dropTargetProvider)
+            dropTargetAccount = targeted ? account.id : (dropTargetAccount == account.id ? nil : dropTargetAccount)
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(provider.displayName), drag to reorder")
+        .accessibilityLabel("\(account.displayName), drag to reorder")
     }
 
     private func securityRow(_ title: String, detail: String, symbol: String) -> some View {
@@ -554,9 +658,9 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private func statusBanner(for provider: AIProvider) -> some View {
-        if let status = statuses[provider],
-           !(dirtyProviders.contains(provider) && status.kind == .success) {
+    private func statusBanner(for account: ProviderAccount) -> some View {
+        if let status = statuses[account.id],
+           !(dirtyAccounts.contains(account.id) && status.kind == .success) {
             let symbol: String = switch status.kind {
             case .information: "info.circle.fill"
             case .success: "checkmark.circle.fill"
@@ -578,19 +682,27 @@ struct SettingsView: View {
         }
     }
 
-    private func actionFooter(for provider: AIProvider, save: @escaping () -> Void) -> some View {
-        HStack {
+    private func actionFooter(for account: ProviderAccount, save: @escaping () -> Void) -> some View {
+        let accountID = account.id
+        return HStack {
             Button("Disconnect…", role: .destructive) {
-                providerToDisconnect = provider
+                accountToDisconnect = accountID
             }
             .disabled(
-                (!store.isConfigured(provider) && statuses[provider]?.kind != .error)
-                    || testingProviders.contains(provider)
+                (!store.isConfigured(accountID) && statuses[accountID]?.kind != .error)
+                    || testingAccounts.contains(accountID)
             )
+
+            if store.accounts(for: account.provider).count > 1 {
+                Button("Remove Account…", role: .destructive) {
+                    accountToRemove = accountID
+                }
+                .disabled(testingAccounts.contains(accountID))
+            }
 
             Spacer()
 
-            if dirtyProviders.contains(provider) {
+            if dirtyAccounts.contains(accountID) {
                 Label("Unsaved changes", systemImage: "circle.fill")
                     .voltChipText()
                     .foregroundStyle(VoltTheme.primary)
@@ -598,16 +710,16 @@ struct SettingsView: View {
 
             Button(action: save) {
                 HStack(spacing: 7) {
-                    if testingProviders.contains(provider) {
+                    if testingAccounts.contains(accountID) {
                         ProgressView().controlSize(.small)
                     }
-                    Text(testingProviders.contains(provider) ? "Testing…" : "Save & Test")
+                    Text(testingAccounts.contains(accountID) ? "Testing…" : "Save & Test")
                 }
                 .frame(minWidth: 78)
             }
             .buttonStyle(.borderedProminent)
             .tint(VoltTheme.primary)
-            .disabled(store.isLoading(provider) || testingProviders.contains(provider))
+            .disabled(store.isLoading(accountID) || testingAccounts.contains(accountID))
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
@@ -619,33 +731,35 @@ struct SettingsView: View {
 
     // MARK: Connection copy helpers
 
-    private func connectionTitle(for provider: AIProvider) -> String {
-        if testingProviders.contains(provider) || store.isLoading(provider) { return "Testing connection…" }
-        if dirtyProviders.contains(provider) { return "Unsaved changes" }
-        if store.snapshot(for: provider) != nil, store.error(for: provider) == nil { return "Connected" }
-        if store.isConfigured(provider) { return "Credentials saved" }
+    private func connectionTitle(for account: ProviderAccount) -> String {
+        if testingAccounts.contains(account.id) || store.isLoading(account.id) { return "Testing connection…" }
+        if dirtyAccounts.contains(account.id) { return "Unsaved changes" }
+        if store.snapshot(for: account.id) != nil, store.error(for: account.id) == nil { return "Connected" }
+        if store.isConfigured(account.id) { return "Credentials saved" }
         return "Not connected"
     }
 
-    private func connectionDetail(for provider: AIProvider) -> String {
-        if dirtyProviders.contains(provider) {
+    private func connectionDetail(for account: ProviderAccount) -> String {
+        if dirtyAccounts.contains(account.id) {
             return "Save and test these changes before Volt uses them."
         }
-        if let snapshot = store.snapshot(for: provider), let subtitle = snapshot.subtitle {
+        if let snapshot = store.snapshot(for: account.id), let subtitle = snapshot.subtitle {
             return subtitle
         }
-        if let error = store.error(for: provider) {
+        if let error = store.error(for: account.id) {
             return error
         }
-        return store.isConfigured(provider)
+        return store.isConfigured(account.id)
             ? "Save & Test to verify the current credentials"
             : "Import credentials below to connect this provider"
     }
 
-    private func connectionColor(for provider: AIProvider) -> Color {
-        if store.error(for: provider) != nil { return .orange }
-        if store.snapshot(for: provider) != nil { return VoltTheme.primary }
-        if store.isConfigured(provider) || dirtyProviders.contains(provider) || testingProviders.contains(provider) {
+    private func connectionColor(for account: ProviderAccount) -> Color {
+        if store.error(for: account.id) != nil { return .orange }
+        if store.snapshot(for: account.id) != nil { return VoltTheme.primary }
+        if store.isConfigured(account.id)
+            || dirtyAccounts.contains(account.id)
+            || testingAccounts.contains(account.id) {
             return VoltTheme.primary
         }
         return .secondary
@@ -697,31 +811,63 @@ struct SettingsView: View {
 
     private func loadCredentials() {
         didLoadCredentials = false
-        defer { didLoadCredentials = true }
+        let dashboardAccount = store.selectedAccount
+        selectedPane = dashboardAccount.provider == .anthropic ? .claude : .openAI
+        selectedClaudeAccountID = dashboardAccount.provider == .anthropic
+            ? dashboardAccount.id
+            : (selectedClaudeAccountID ?? store.accounts(for: .anthropic).first?.id)
+        selectedOpenAIAccountID = dashboardAccount.provider == .openAI
+            ? dashboardAccount.id
+            : (selectedOpenAIAccountID ?? store.accounts(for: .openAI).first?.id)
+        loadClaudeCredentials()
+        loadOpenAICredentials()
+        dirtyAccounts.removeAll()
+        didLoadCredentials = true
+    }
 
+    private func loadClaudeCredentials() {
+        guard let accountID = selectedClaudeAccountID,
+              let account = store.account(for: accountID)
+        else { return }
+        let wasLoaded = didLoadCredentials
+        didLoadCredentials = false
+        defer { didLoadCredentials = wasLoaded }
+        claudeAccountName = account.displayName
+        savedClaudeAccountName = account.displayName
         do {
-            let credentials = try store.claudeCredentials()
+            let credentials = try store.claudeCredentials(accountID: accountID)
             applyClaudeCredentials(credentials)
             savedClaudeCredentials = normalizedClaude(credentials)
+            dirtyAccounts.remove(accountID)
         } catch {
-            statuses[.anthropic] = SettingsStatus(message: error.localizedDescription, kind: .error)
+            statuses[accountID] = SettingsStatus(message: error.localizedDescription, kind: .error)
         }
+    }
 
+    private func loadOpenAICredentials() {
+        guard let accountID = selectedOpenAIAccountID,
+              let account = store.account(for: accountID)
+        else { return }
+        let wasLoaded = didLoadCredentials
+        didLoadCredentials = false
+        defer { didLoadCredentials = wasLoaded }
+        openAIAccountName = account.displayName
+        savedOpenAIAccountName = account.displayName
         do {
-            let credentials = try store.openAICredentials()
+            let credentials = try store.openAICredentials(accountID: accountID)
             applyOpenAICredentials(credentials)
             savedOpenAICredentials = normalizedOpenAI(credentials)
+            dirtyAccounts.remove(accountID)
         } catch {
-            statuses[.openAI] = SettingsStatus(message: error.localizedDescription, kind: .error)
+            statuses[accountID] = SettingsStatus(message: error.localizedDescription, kind: .error)
         }
-
-        dirtyProviders.removeAll()
     }
 
     private func saveClaudeAndTest() {
+        guard let accountID = selectedClaudeAccountID else { return }
         let credentials = draftClaudeCredentials
         guard credentials.isComplete else {
-            statuses[.anthropic] = SettingsStatus(
+            statuses[accountID] = SettingsStatus(
                 message: "Import Claude Code credentials or complete both browser-session fields.",
                 kind: .error
             )
@@ -729,50 +875,57 @@ struct SettingsView: View {
         }
 
         do {
-            try store.saveClaude(credentials)
+            store.renameAccount(accountID, to: claudeAccountName)
+            try store.saveClaude(credentials, accountID: accountID)
             savedClaudeCredentials = credentials
-            dirtyProviders.remove(.anthropic)
-            testingProviders.insert(.anthropic)
-            statuses[.anthropic] = SettingsStatus(
+            savedClaudeAccountName = store.account(for: accountID)?.displayName
+                ?? normalizedName(claudeAccountName)
+            claudeAccountName = savedClaudeAccountName
+            let savedName = savedClaudeAccountName
+            dirtyAccounts.remove(accountID)
+            testingAccounts.insert(accountID)
+            statuses[accountID] = SettingsStatus(
                 message: "Credentials saved. Testing the connection…",
                 kind: .information
             )
             Task {
-                let succeeded = await store.refresh(.anthropic)
-                testingProviders.remove(.anthropic)
-                if succeeded, store.snapshot(for: .anthropic) != nil {
-                    if let refreshed = try? store.claudeCredentials() {
+                let succeeded = await store.refresh(accountID)
+                testingAccounts.remove(accountID)
+                if succeeded, store.snapshot(for: accountID) != nil {
+                    if let refreshed = try? store.claudeCredentials(accountID: accountID) {
                         let draftWasUnchanged = draftClaudeCredentials == credentials
+                            && normalizedName(claudeAccountName) == savedName
                         savedClaudeCredentials = normalizedClaude(refreshed)
-                        if draftWasUnchanged {
+                        if draftWasUnchanged, selectedClaudeAccountID == accountID {
                             applyClaudeCredentials(refreshed)
-                            dirtyProviders.remove(.anthropic)
+                            dirtyAccounts.remove(accountID)
                         } else {
-                            dirtyProviders.insert(.anthropic)
+                            dirtyAccounts.insert(accountID)
                         }
                     }
-                    statuses[.anthropic] = SettingsStatus(
+                    statuses[accountID] = SettingsStatus(
                         message: "Claude connected successfully.",
                         kind: .success
                     )
-                } else if let error = store.error(for: .anthropic) {
-                    statuses[.anthropic] = SettingsStatus(message: error, kind: .error)
+                } else if let error = store.error(for: accountID) {
+                    statuses[accountID] = SettingsStatus(message: error, kind: .error)
                 } else {
-                    statuses[.anthropic] = SettingsStatus(
+                    statuses[accountID] = SettingsStatus(
                         message: "The connection test did not complete. Try again.",
                         kind: .error
                     )
                 }
             }
         } catch {
-            statuses[.anthropic] = SettingsStatus(message: error.localizedDescription, kind: .error)
+            statuses[accountID] = SettingsStatus(message: error.localizedDescription, kind: .error)
         }
     }
 
     private func saveOpenAIAndTest() {
+        guard let accountID = selectedOpenAIAccountID else { return }
         let credentials = draftOpenAICredentials
         guard credentials.isComplete else {
-            statuses[.openAI] = SettingsStatus(
+            statuses[accountID] = SettingsStatus(
                 message: "Import Codex auth.json or enter an OAuth access token.",
                 kind: .error
             )
@@ -780,47 +933,54 @@ struct SettingsView: View {
         }
 
         do {
-            try store.saveOpenAI(credentials)
+            store.renameAccount(accountID, to: openAIAccountName)
+            try store.saveOpenAI(credentials, accountID: accountID)
             savedOpenAICredentials = credentials
-            dirtyProviders.remove(.openAI)
-            testingProviders.insert(.openAI)
-            statuses[.openAI] = SettingsStatus(
+            savedOpenAIAccountName = store.account(for: accountID)?.displayName
+                ?? normalizedName(openAIAccountName)
+            openAIAccountName = savedOpenAIAccountName
+            let savedName = savedOpenAIAccountName
+            dirtyAccounts.remove(accountID)
+            testingAccounts.insert(accountID)
+            statuses[accountID] = SettingsStatus(
                 message: "Credentials saved. Testing the connection…",
                 kind: .information
             )
             Task {
-                let succeeded = await store.refresh(.openAI)
-                testingProviders.remove(.openAI)
-                if succeeded, store.snapshot(for: .openAI) != nil {
-                    if let refreshed = try? store.openAICredentials() {
+                let succeeded = await store.refresh(accountID)
+                testingAccounts.remove(accountID)
+                if succeeded, store.snapshot(for: accountID) != nil {
+                    if let refreshed = try? store.openAICredentials(accountID: accountID) {
                         let draftWasUnchanged = draftOpenAICredentials == credentials
+                            && normalizedName(openAIAccountName) == savedName
                         savedOpenAICredentials = normalizedOpenAI(refreshed)
-                        if draftWasUnchanged {
+                        if draftWasUnchanged, selectedOpenAIAccountID == accountID {
                             applyOpenAICredentials(refreshed)
-                            dirtyProviders.remove(.openAI)
+                            dirtyAccounts.remove(accountID)
                         } else {
-                            dirtyProviders.insert(.openAI)
+                            dirtyAccounts.insert(accountID)
                         }
                     }
-                    statuses[.openAI] = SettingsStatus(
+                    statuses[accountID] = SettingsStatus(
                         message: "OpenAI connected successfully.",
                         kind: .success
                     )
-                } else if let error = store.error(for: .openAI) {
-                    statuses[.openAI] = SettingsStatus(message: error, kind: .error)
+                } else if let error = store.error(for: accountID) {
+                    statuses[accountID] = SettingsStatus(message: error, kind: .error)
                 } else {
-                    statuses[.openAI] = SettingsStatus(
+                    statuses[accountID] = SettingsStatus(
                         message: "The connection test did not complete. Try again.",
                         kind: .error
                     )
                 }
             }
         } catch {
-            statuses[.openAI] = SettingsStatus(message: error.localizedDescription, kind: .error)
+            statuses[accountID] = SettingsStatus(message: error.localizedDescription, kind: .error)
         }
     }
 
     private func importClaudeCredentials() {
+        guard let accountID = selectedClaudeAccountID else { return }
         let panel = credentialPanel(
             title: "Choose Claude Code .credentials.json",
             defaultDirectory: ".claude",
@@ -836,16 +996,17 @@ struct SettingsView: View {
             claudeOAuthScopes = imported.oauthScopes ?? []
             claudeOAuthRateLimitTier = imported.oauthRateLimitTier
             claudeOAuthSubscriptionType = imported.oauthSubscriptionType
-            statuses[.anthropic] = SettingsStatus(
+            statuses[accountID] = SettingsStatus(
                 message: "Imported Claude Code credentials. Select Save & Test to connect.",
                 kind: .information
             )
         } catch {
-            statuses[.anthropic] = SettingsStatus(message: error.localizedDescription, kind: .error)
+            statuses[accountID] = SettingsStatus(message: error.localizedDescription, kind: .error)
         }
     }
 
     private func importCodexCredentials() {
+        guard let accountID = selectedOpenAIAccountID else { return }
         let panel = credentialPanel(
             title: "Choose Codex auth.json",
             defaultDirectory: ".codex",
@@ -860,12 +1021,15 @@ struct SettingsView: View {
             openAIIDToken = credentials.idToken
             openAIAccountID = credentials.accountID
             openAILastRefresh = credentials.lastRefresh
-            statuses[.openAI] = SettingsStatus(
+            if openAIAccountName.hasPrefix("OpenAI"), let email = credentials.accountEmail {
+                openAIAccountName = email
+            }
+            statuses[accountID] = SettingsStatus(
                 message: "Imported Codex credentials. Select Save & Test to connect.",
                 kind: .information
             )
         } catch {
-            statuses[.openAI] = SettingsStatus(message: error.localizedDescription, kind: .error)
+            statuses[accountID] = SettingsStatus(message: error.localizedDescription, kind: .error)
         }
     }
 
@@ -907,61 +1071,112 @@ struct SettingsView: View {
         openAILastRefresh = credentials.lastRefresh
     }
 
-    private func updateDirtyState(_ provider: AIProvider, isDirty: Bool) {
-        guard didLoadCredentials else { return }
+    private func updateDirtyState(_ accountID: UUID?, isDirty: Bool) {
+        guard didLoadCredentials, let accountID else { return }
         if isDirty {
-            dirtyProviders.insert(provider)
-            if statuses[provider]?.kind != .information {
-                statuses.removeValue(forKey: provider)
+            dirtyAccounts.insert(accountID)
+            if statuses[accountID]?.kind != .information {
+                statuses.removeValue(forKey: accountID)
             }
         } else {
-            dirtyProviders.remove(provider)
+            dirtyAccounts.remove(accountID)
         }
     }
 
     private func disconnectSelectedProvider() {
-        guard let provider = providerToDisconnect else { return }
-        defer { providerToDisconnect = nil }
+        guard let accountID = accountToDisconnect,
+              let account = store.account(for: accountID)
+        else { return }
+        defer { accountToDisconnect = nil }
         do {
-            try store.disconnect(provider)
-            switch provider {
+            try store.disconnect(accountID)
+            switch account.provider {
             case .anthropic:
-                let empty = ClaudeCredentials()
-                applyClaudeCredentials(empty)
-                savedClaudeCredentials = empty
+                if selectedClaudeAccountID == accountID {
+                    loadClaudeCredentials()
+                }
             case .openAI:
-                let empty = OpenAICredentials(
-                    accessToken: "",
-                    refreshToken: "",
-                    idToken: "",
-                    accountID: "",
-                    lastRefresh: nil
-                )
-                applyOpenAICredentials(empty)
-                savedOpenAICredentials = empty
+                if selectedOpenAIAccountID == accountID {
+                    loadOpenAICredentials()
+                }
             }
-            dirtyProviders.remove(provider)
-            statuses[provider] = SettingsStatus(
-                message: "\(provider.displayName) disconnected.",
+            dirtyAccounts.remove(accountID)
+            statuses[accountID] = SettingsStatus(
+                message: "\(account.displayName) disconnected.",
                 kind: .success
             )
         } catch {
-            statuses[provider] = SettingsStatus(message: error.localizedDescription, kind: .error)
+            statuses[accountID] = SettingsStatus(message: error.localizedDescription, kind: .error)
         }
     }
 
-    private func nilIfEmpty(_ value: String) -> String? {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
+    private func addAccount(_ provider: AIProvider) {
+        let account = store.addAccount(provider: provider)
+        switch provider {
+        case .anthropic:
+            selectedClaudeAccountID = account.id
+        case .openAI:
+            selectedOpenAIAccountID = account.id
+        }
     }
-}
 
-extension AIProvider: Transferable {
-    static var transferRepresentation: some TransferRepresentation {
-        ProxyRepresentation(
-            exporting: { $0.rawValue },
-            importing: { AIProvider(rawValue: $0) ?? .anthropic }
+    private func discardChanges(for provider: AIProvider) {
+        switch provider {
+        case .anthropic:
+            loadClaudeCredentials()
+        case .openAI:
+            loadOpenAICredentials()
+        }
+    }
+
+    private func removeSelectedAccount() {
+        guard let accountID = accountToRemove,
+              let account = store.account(for: accountID)
+        else { return }
+        defer { accountToRemove = nil }
+        do {
+            try store.removeAccount(accountID)
+            statuses.removeValue(forKey: accountID)
+            dirtyAccounts.remove(accountID)
+            switch account.provider {
+            case .anthropic:
+                selectedClaudeAccountID = store.accounts(for: .anthropic).first?.id
+            case .openAI:
+                selectedOpenAIAccountID = store.accounts(for: .openAI).first?.id
+            }
+        } catch {
+            statuses[accountID] = SettingsStatus(message: error.localizedDescription, kind: .error)
+        }
+    }
+
+    private func selectedAccount(for provider: AIProvider) -> ProviderAccount? {
+        let accountID = provider == .anthropic ? selectedClaudeAccountID : selectedOpenAIAccountID
+        return accountID.flatMap(store.account(for:))
+    }
+
+    private func accountSelectionBinding(for provider: AIProvider) -> Binding<UUID> {
+        Binding(
+            get: {
+                let selected = provider == .anthropic ? selectedClaudeAccountID : selectedOpenAIAccountID
+                return selected ?? store.accounts(for: provider)[0].id
+            },
+            set: { accountID in
+                if provider == .anthropic {
+                    selectedClaudeAccountID = accountID
+                } else {
+                    selectedOpenAIAccountID = accountID
+                }
+            }
         )
+    }
+
+    private func accountNameBinding(for provider: AIProvider) -> Binding<String> {
+        provider == .anthropic ? $claudeAccountName : $openAIAccountName
+    }
+
+    private func normalizedName(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Account" : trimmed
     }
 }
 

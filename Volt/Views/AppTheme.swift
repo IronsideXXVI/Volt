@@ -5,10 +5,9 @@ import SwiftUI
 /// materials, hairline dividers, and provider tints rather than gradients or
 /// glows, so the interface stays quiet and legible in light and dark modes.
 enum VoltTheme {
-    /// Volt's brand accent — a refined magenta used sparingly for app-level
-    /// (non-provider) emphasis such as the wordmark and General settings.
+    /// Volt's one brand accent — used sparingly for usage bars, links outside
+    /// notices, Save & Test, and active native controls.
     static let primary = Color(hex: "D94BC9")
-    static let electricBlue = Color(hex: "7B61FF")
 
     /// Neutral gray for the "time elapsed" comparison bar. Adaptive so it reads
     /// darker in light mode while staying visible against a dark background.
@@ -117,25 +116,6 @@ struct VoltGlyph: View {
     }
 }
 
-/// A provider's monochrome logo on a low-opacity rounded square — the branded
-/// counterpart to `VoltGlyph`, matching the logos shown in the popover switcher.
-struct VoltLogoGlyph: View {
-    let asset: String
-    let tint: Color
-    var size: CGFloat = 34
-
-    var body: some View {
-        Image(asset)
-            .renderingMode(.template)
-            .resizable()
-            .scaledToFit()
-            .frame(width: size * 0.5, height: size * 0.5)
-            .foregroundStyle(tint)
-            .frame(width: size, height: size)
-            .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: size * 0.3, style: .continuous))
-    }
-}
-
 /// A concise section heading: a title with an optional trailing accessory.
 struct SectionHeader<Accessory: View>: View {
     let title: String
@@ -161,6 +141,128 @@ struct SectionHeader<Accessory: View>: View {
 extension SectionHeader where Accessory == EmptyView {
     init(_ title: String, detail: String? = nil) {
         self.init(title: title, detail: detail, accessory: { EmptyView() })
+    }
+}
+
+/// The semantic meaning of an inline notice. Severity changes only the symbol
+/// and VoiceOver prefix; every visual treatment remains neutral.
+enum VoltNoticeKind {
+    case information
+    case success
+    case warning
+    case error
+
+    fileprivate var symbol: String {
+        switch self {
+        case .information:
+            return "info.circle.fill"
+        case .success:
+            return "checkmark.circle.fill"
+        case .warning:
+            return "exclamationmark.triangle.fill"
+        case .error:
+            return "xmark.circle.fill"
+        }
+    }
+
+    fileprivate var accessibilityPrefix: String {
+        switch self {
+        case .information:
+            return "Information"
+        case .success:
+            return "Success"
+        case .warning:
+            return "Warning"
+        case .error:
+            return "Error"
+        }
+    }
+}
+
+/// The single shared treatment for inline notices in both the drawer and
+/// Settings. Its fill intentionally matches the unused portion of limit bars.
+struct VoltNotice: View {
+    let message: String
+    let kind: VoltNoticeKind
+    private let parsesMarkdown: Bool
+
+    init(_ message: String, kind: VoltNoticeKind) {
+        self.message = message
+        self.kind = kind
+        parsesMarkdown = true
+    }
+
+    /// Use for operational or provider error text that must be displayed
+    /// literally rather than interpreted as Markdown.
+    init(verbatim message: String, kind: VoltNoticeKind) {
+        self.message = message
+        self.kind = kind
+        parsesMarkdown = false
+    }
+
+    private var markdown: AttributedString {
+        var attributed: AttributedString
+        if parsesMarkdown {
+            attributed = (try? AttributedString(
+                markdown: message,
+                options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+            )) ?? AttributedString(message)
+        } else {
+            attributed = AttributedString(message)
+        }
+
+        let linkRanges = attributed.runs
+            .filter { $0.link != nil }
+            .map(\.range)
+        for range in linkRanges {
+            attributed[range].foregroundColor = Color.secondary
+            attributed[range].underlineStyle = .single
+        }
+        return attributed
+    }
+
+    private func noticeContent(_ attributed: AttributedString, exposesPrefix: Bool) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: kind.symbol)
+                .font(.system(size: 11, weight: .medium))
+                .padding(.top, 1)
+                .accessibilityLabel(kind.accessibilityPrefix)
+                .accessibilityHidden(!exposesPrefix)
+
+            Text(attributed)
+                .voltCaption()
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(.secondary)
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(VoltTheme.track)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .strokeBorder(VoltTheme.hairline, lineWidth: 0.5)
+        }
+    }
+
+    @ViewBuilder
+    var body: some View {
+        let attributed = markdown
+        let hasLinks = attributed.runs.contains { $0.link != nil }
+
+        if hasLinks {
+            noticeContent(attributed, exposesPrefix: true)
+                .accessibilityElement(children: .contain)
+        } else {
+            noticeContent(attributed, exposesPrefix: false)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(
+                    "\(kind.accessibilityPrefix), \(String(attributed.characters))"
+                )
+        }
     }
 }
 
@@ -202,24 +304,4 @@ extension View {
     /// toggle's title, a key in a key/value row, a disclosure heading.
     func voltControlLabel() -> some View { font(.system(size: 12, weight: .semibold)) }
 
-    /// Emphatic small text inside a status pill or inline status label. The
-    /// caller supplies the semantic color (primary / orange / green).
-    func voltChipText() -> some View { font(.system(size: 11, weight: .semibold)) }
-}
-
-extension View {
-    /// A quiet card: subtle fill, hairline border, continuous corners.
-    func voltCard(cornerRadius: CGFloat = 12, padding: CGFloat = 14) -> some View {
-        self
-            .padding(padding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(VoltTheme.card)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(VoltTheme.hairline, lineWidth: 0.5)
-            }
-    }
 }

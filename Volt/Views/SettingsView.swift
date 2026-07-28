@@ -39,14 +39,8 @@ private enum SettingsPane: String, CaseIterable, Identifiable, Equatable {
 }
 
 private struct SettingsStatus {
-    enum Kind: Equatable {
-        case information
-        case success
-        case error
-    }
-
     let message: String
-    let kind: Kind
+    let kind: VoltNoticeKind
 }
 
 struct SettingsView: View {
@@ -56,8 +50,6 @@ struct SettingsView: View {
     @State private var selectedPane = SettingsPane.general
     @State private var selectedClaudeAccountID: UUID?
     @State private var selectedOpenAIAccountID: UUID?
-    @State private var claudeAccountName = ""
-    @State private var openAIAccountName = ""
     @State private var organizationID = ""
     @State private var claudeSessionKey = ""
     @State private var claudeOAuthAccessToken = ""
@@ -77,8 +69,6 @@ struct SettingsView: View {
     @State private var testingAccounts: Set<UUID> = []
     @State private var dirtyAccounts: Set<UUID> = []
     @State private var didLoadCredentials = false
-    @State private var savedClaudeAccountName = ""
-    @State private var savedOpenAIAccountName = ""
     @State private var savedClaudeCredentials = ClaudeCredentials()
     @State private var savedOpenAICredentials = OpenAICredentials(
         accessToken: "",
@@ -107,28 +97,12 @@ struct SettingsView: View {
             updateDirtyState(
                 selectedClaudeAccountID,
                 isDirty: credentials != savedClaudeCredentials
-                    || normalizedName(claudeAccountName) != savedClaudeAccountName
             )
         }
         .onChange(of: draftOpenAICredentials) { _, credentials in
             updateDirtyState(
                 selectedOpenAIAccountID,
                 isDirty: credentials != savedOpenAICredentials
-                    || normalizedName(openAIAccountName) != savedOpenAIAccountName
-            )
-        }
-        .onChange(of: claudeAccountName) { _, name in
-            updateDirtyState(
-                selectedClaudeAccountID,
-                isDirty: draftClaudeCredentials != savedClaudeCredentials
-                    || normalizedName(name) != savedClaudeAccountName
-            )
-        }
-        .onChange(of: openAIAccountName) { _, name in
-            updateDirtyState(
-                selectedOpenAIAccountID,
-                isDirty: draftOpenAICredentials != savedOpenAICredentials
-                    || normalizedName(name) != savedOpenAIAccountName
             )
         }
         .onChange(of: selectedClaudeAccountID) {
@@ -138,7 +112,7 @@ struct SettingsView: View {
             loadOpenAICredentials()
         }
         .confirmationDialog(
-            "Disconnect \(accountToDisconnect.flatMap(store.account(for:))?.displayName ?? "account")?",
+            "Disconnect \(accountToDisconnect.map(store.accountLabel(for:)) ?? "account")?",
             isPresented: Binding(
                 get: { accountToDisconnect != nil },
                 set: { if !$0 { accountToDisconnect = nil } }
@@ -155,7 +129,7 @@ struct SettingsView: View {
             Text("Volt will remove this account's saved credentials and cached usage.")
         }
         .confirmationDialog(
-            "Remove \(accountToRemove.flatMap(store.account(for:))?.displayName ?? "account")?",
+            "Remove \(accountToRemove.map(store.accountLabel(for:)) ?? "account")?",
             isPresented: Binding(
                 get: { accountToRemove != nil },
                 set: { if !$0 { accountToRemove = nil } }
@@ -220,7 +194,7 @@ struct SettingsView: View {
                             .frame(width: 15, height: 15)
                     }
                 }
-                .foregroundStyle(isSelected ? VoltTheme.primary : Color.secondary)
+                .foregroundStyle(isSelected ? Color.primary : Color.secondary)
 
                 Text(pane.title)
                     .voltTabLabel(selected: isSelected)
@@ -237,6 +211,7 @@ struct SettingsView: View {
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 10)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     // MARK: Pane routing
@@ -273,58 +248,90 @@ struct SettingsView: View {
 
     private var generalPane: some View {
         settingsPage(title: "General", subtitle: "Dashboard behavior and local data handling") {
-            VStack(alignment: .leading, spacing: 12) {
-                SectionHeader("Dashboard order", detail: "Drag to set the order account tabs appear in the menu.")
-                VStack(spacing: 8) {
-                    ForEach(store.accounts) { account in
+            VStack(alignment: .leading, spacing: 14) {
+                SectionHeader(
+                    "Account tabs",
+                    detail: "Show or hide tab numbers and drag accounts into their global drawer order."
+                )
+
+                Toggle(isOn: Binding(
+                    get: { store.showsAccountNumbers },
+                    set: { store.showsAccountNumbers = $0 }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Show account numbers in drawer")
+                            .voltControlLabel()
+                        Text("Show each tab's global drawer-order number.")
+                            .voltCaption()
+                    }
+                }
+                .padding(.vertical, 10)
+
+                Divider()
+
+                VStack(spacing: 0) {
+                    ForEach(Array(store.accounts.enumerated()), id: \.element.id) { index, account in
+                        if index > 0 {
+                            Divider()
+                        }
                         accountOrderRow(account)
                     }
                 }
             }
-            .voltCard()
 
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 14) {
                 SectionHeader("Privacy", detail: "Your provider data stays between this Mac and the provider.")
-                securityRow("Encrypted credential storage", detail: "Secrets are stored in your macOS login Keychain.", symbol: "key.fill")
-                securityRow("Direct provider requests", detail: "Usage requests go directly to Anthropic and OpenAI.", symbol: "arrow.left.arrow.right")
-                securityRow("No credential telemetry", detail: "Volt does not proxy, log, or upload credentials.", symbol: "eye.slash.fill")
+                VStack(spacing: 0) {
+                    securityRow("Encrypted credential storage", detail: "Secrets are stored in your macOS login Keychain.", symbol: "key.fill")
+                    Divider()
+                    securityRow("Direct provider requests", detail: "Usage requests go directly to Anthropic and OpenAI.", symbol: "arrow.left.arrow.right")
+                    Divider()
+                    securityRow("No credential telemetry", detail: "Volt does not proxy, log, or upload credentials.", symbol: "eye.slash.fill")
+                }
             }
-            .voltCard()
         }
     }
 
     private var updatesPane: some View {
         settingsPage(title: "Updates", subtitle: "Stay compatible as provider APIs and usage fields evolve") {
             VStack(alignment: .leading, spacing: 14) {
-                SectionHeader("Software updates", detail: "Volt checks securely through Sparkle.")
+                SectionHeader("Software Updates", detail: "Volt checks securely through Sparkle.")
 
-                Toggle(isOn: Binding(
-                    get: { updates.automaticallyChecksForUpdates },
-                    set: { updates.automaticallyChecksForUpdates = $0 }
-                )) {
-                    Text("Automatically check for updates")
-                        .voltControlLabel()
-                }
-
-                Divider()
-
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Installed version")
-                            .voltControlLabel()
-                        Text(appVersion)
-                            .voltDetailValue()
-                            .foregroundStyle(.secondary)
+                VStack(spacing: 0) {
+                    Toggle(isOn: Binding(
+                        get: { updates.automaticallyChecksForUpdates },
+                        set: { updates.automaticallyChecksForUpdates = $0 }
+                    )) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Automatically check for updates")
+                                .voltControlLabel()
+                            Text("Let Sparkle check for new Volt releases.")
+                                .voltCaption()
+                        }
                     }
-                    Spacer()
-                    Button("Check for Updates…") {
-                        updates.checkForUpdates()
+                    .padding(.vertical, 10)
+
+                    Divider()
+
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Installed version")
+                                .voltControlLabel()
+                            Text(appVersion)
+                                .voltDetailValue()
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button("Check for Updates…") {
+                            updates.checkForUpdates()
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(Color.secondary)
+                        .disabled(!updates.canCheckForUpdates)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!updates.canCheckForUpdates)
+                    .padding(.vertical, 10)
                 }
             }
-            .voltCard()
         }
     }
 
@@ -332,81 +339,80 @@ struct SettingsView: View {
 
     private var claudeConnectionContent: some View {
         Group {
-            importCard(
-                provider: .anthropic,
-                title: "Claude Code",
-                detail: "Import the OAuth credentials created by `claude login`. This is the most reliable route and avoids browser-session challenges.",
+            credentialsSection(
+                detail: "Import the OAuth credentials created by claude login. This is the most reliable route and avoids browser-session challenges.",
                 buttonTitle: "Import .credentials.json",
-                isReady: !claudeOAuthAccessToken.isEmpty,
+                isReady: draftClaudeCredentials.hasOAuthCredentials,
                 action: importClaudeCredentials
             )
 
-            VStack(alignment: .leading, spacing: 0) {
-                DisclosureGroup {
-                    VStack(spacing: 10) {
-                        SecretInput(title: "Access token", text: $claudeOAuthAccessToken)
-                        SecretInput(title: "Refresh token", text: $claudeOAuthRefreshToken)
-                    }
-                    .padding(.top, 12)
-                } label: {
-                    advancedLabel("Manual OAuth fields", detail: "For advanced setup and troubleshooting")
+            advancedCredentials {
+                advancedSubsection(
+                    "Manual OAuth fields",
+                    detail: "For advanced setup and troubleshooting"
+                ) {
+                    SecretInput(title: "Access token", text: $claudeOAuthAccessToken)
+                    SecretInput(title: "Refresh token", text: $claudeOAuthRefreshToken)
                 }
-            }
-            .voltCard()
 
-            VStack(alignment: .leading, spacing: 0) {
-                DisclosureGroup {
+                Divider()
+
+                advancedSubsection(
+                    "Browser session fallback",
+                    detail: "Optional access to credits and account details"
+                ) {
                     VStack(alignment: .leading, spacing: 10) {
                         TextField("Organization ID", text: $organizationID)
                             .textFieldStyle(.roundedBorder)
                         SecretInput(title: "Session key", text: $claudeSessionKey)
-                        Text("Use the organization UUID and `sessionKey` cookie from a signed-in claude.ai session. Browser sessions can expire or be challenged by Cloudflare.")
-                            .voltCaption()
-                            .fixedSize(horizontal: false, vertical: true)
+                        VoltNotice(
+                            "Use the organization UUID and `sessionKey` cookie from a signed-in claude.ai session. Browser sessions can expire or be challenged by Cloudflare.",
+                            kind: .warning
+                        )
                     }
-                    .padding(.top, 12)
-                } label: {
-                    advancedLabel("Browser session fallback", detail: "Optional access to credits and account details")
                 }
             }
-            .voltCard()
         }
     }
 
     private var openAIConnectionContent: some View {
         Group {
-            importCard(
-                provider: .openAI,
-                title: "Codex authentication",
-                detail: "Run `codex login`, then import ~/.codex/auth.json. Volt keeps an encrypted copy so the access token can refresh automatically.",
+            credentialsSection(
+                detail: "Run codex login, then import ~/.codex/auth.json. Volt keeps an encrypted copy so the access token can refresh automatically.",
                 buttonTitle: "Import auth.json",
-                isReady: !openAIAccessToken.isEmpty,
+                isReady: draftOpenAICredentials.isComplete,
                 action: importCodexCredentials
             )
 
-            VStack(alignment: .leading, spacing: 0) {
-                DisclosureGroup {
-                    VStack(spacing: 10) {
+            advancedCredentials {
+                advancedSubsection(
+                    "OAuth tokens",
+                    detail: "Manual token entry for advanced setup and troubleshooting"
+                ) {
+                    VStack(alignment: .leading, spacing: 10) {
                         SecretInput(title: "Access token", text: $openAIAccessToken)
                         SecretInput(title: "Refresh token", text: $openAIRefreshToken)
                         SecretInput(title: "ID token", text: $openAIIDToken)
+                    }
+                }
+
+                Divider()
+
+                advancedSubsection(
+                    "Account context",
+                    detail: "Optional routing metadata from Codex authentication"
+                ) {
+                    VStack(alignment: .leading, spacing: 10) {
                         TextField("ChatGPT account ID (optional)", text: $openAIAccountID)
                             .textFieldStyle(.roundedBorder)
                     }
-                    .padding(.top, 12)
-                } label: {
-                    advancedLabel("Manual OAuth fields", detail: "For advanced setup and troubleshooting")
                 }
             }
-            .voltCard()
 
-            Label(
+            VoltNotice(
                 "Codex plan limits use ChatGPT's authenticated usage endpoint. It is not a public API and may change.",
-                systemImage: "info.circle.fill"
+                kind: .information
             )
-            .voltCaption()
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.horizontal, 2)
         }
     }
 
@@ -421,10 +427,10 @@ struct SettingsView: View {
             pageHeader(title: title, subtitle: subtitle)
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    accountManagementCard(for: provider)
+                VStack(alignment: .leading, spacing: 22) {
+                    accountManagementSection(for: provider)
                     if let account = selectedAccount(for: provider) {
-                        connectionStatusCard(for: account)
+                        connectionSummary(for: account)
                     }
                     content()
                     if let account = selectedAccount(for: provider) {
@@ -449,7 +455,7 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             pageHeader(title: title, subtitle: subtitle)
             ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 24) {
                     content()
                 }
                 .padding(20)
@@ -476,19 +482,19 @@ struct SettingsView: View {
 
     // MARK: Provider page pieces
 
-    private func accountManagementCard(for provider: AIProvider) -> some View {
+    private func accountManagementSection(for provider: AIProvider) -> some View {
         let providerAccounts = store.accounts(for: provider)
         let selection = accountSelectionBinding(for: provider)
         let isDirty = dirtyAccounts.contains(selection.wrappedValue)
         let isBusy = isDirty || testingAccounts.contains(selection.wrappedValue)
 
-        return VStack(alignment: .leading, spacing: 11) {
-            SectionHeader("Account tab", detail: "Each account appears as its own tab in the Volt drawer.")
+        return VStack(alignment: .leading, spacing: 12) {
+            SectionHeader("Accounts", detail: "Each account appears as its own tab in the Volt drawer.")
 
             HStack(spacing: 8) {
                 Picker("Account", selection: selection) {
                     ForEach(providerAccounts) { account in
-                        Text(account.displayName).tag(account.id)
+                        Text(store.accountLabel(for: account)).tag(account.id)
                     }
                 }
                 .labelsHidden()
@@ -499,61 +505,48 @@ struct SettingsView: View {
                 } label: {
                     Label("Add Account", systemImage: "plus")
                 }
+                .buttonStyle(.bordered)
+                .tint(Color.secondary)
                 .disabled(isBusy)
             }
-
-            TextField("Tab name", text: accountNameBinding(for: provider))
-                .textFieldStyle(.roundedBorder)
-
-            if isDirty {
-                HStack {
-                    Text("Save or discard changes before switching accounts.")
-                        .voltCaption()
-                    Spacer()
-                    Button("Discard Changes") {
-                        discardChanges(for: provider)
-                    }
-                }
-            }
         }
-        .voltCard()
     }
 
-    private func connectionStatusCard(for account: ProviderAccount) -> some View {
+    private func connectionSummary(for account: ProviderAccount) -> some View {
         let provider = account.provider
-        return HStack(spacing: 12) {
-            VoltLogoGlyph(asset: provider.logoAsset, tint: provider.tint, size: 36)
+        return VStack(alignment: .leading, spacing: 12) {
+            SectionHeader("Connection")
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(connectionTitle(for: account))
-                    .voltControlLabel()
-                    .foregroundStyle(connectionColor(for: account))
-                Text(connectionDetail(for: account))
-                    .voltCaption()
-                    .lineLimit(3)
-                    .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .top, spacing: 10) {
+                Image(provider.logoAsset)
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 16, height: 16)
+                    .foregroundStyle(.secondary)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(connectionTitle(for: account))
+                        .voltControlLabel()
+                    Text(connectionDetail(for: account))
+                        .voltCaption()
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 12)
             }
-
-            Spacer(minLength: 12)
         }
-        .voltCard()
     }
 
-    private func importCard(
-        provider: AIProvider,
-        title: String,
+    private func credentialsSection(
         detail: String,
         buttonTitle: String,
         isReady: Bool,
         action: @escaping () -> Void
     ) -> some View {
-        VStack(alignment: .leading, spacing: 11) {
-            HStack(alignment: .firstTextBaseline) {
-                Label(title, systemImage: "terminal.fill")
-                    .voltControlLabel()
-                Spacer()
-                statusChip(title: "Recommended", color: VoltTheme.primary, symbol: "star.fill")
-            }
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeader("Credentials")
 
             Text(detail)
                 .voltCaption()
@@ -563,54 +556,81 @@ struct SettingsView: View {
                 Button(action: action) {
                     Label(buttonTitle, systemImage: "square.and.arrow.down")
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(VoltTheme.primary)
+                .buttonStyle(.bordered)
+                .tint(Color.secondary)
 
-                if isReady {
-                    statusChip(title: "Credential ready", color: VoltTheme.primary, symbol: "checkmark")
-                }
+                Text(isReady ? "Recommended · Credential ready" : "Recommended")
+                    .voltCaption()
             }
         }
-        .voltCard()
     }
 
-    private func advancedLabel(_ title: String, detail: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .voltControlLabel()
-            Text(detail)
-                .voltCaption()
+    private func advancedCredentials<Content: View>(
+        @ViewBuilder content: @escaping () -> Content
+    ) -> some View {
+        DisclosureGroup {
+            VStack(alignment: .leading, spacing: 14) {
+                content()
+            }
+            .padding(.top, 14)
+        } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Advanced")
+                    .voltControlLabel()
+                Text("Manual credential fields and provider-specific fallbacks")
+                    .voltCaption()
+            }
         }
+    }
+
+    private func advancedSubsection<Content: View>(
+        _ title: String,
+        detail: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .voltControlLabel()
+                Text(detail)
+                    .voltCaption()
+            }
+            content()
+        }
+        .padding(.vertical, 2)
     }
 
     private func accountOrderRow(_ account: ProviderAccount) -> some View {
         let provider = account.provider
         let isDropTarget = dropTargetAccount == account.id
+        let position = store.accountOrdinal(for: account) ?? 1
 
         return HStack(spacing: 11) {
             Image(systemName: "line.3.horizontal")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
-            VoltLogoGlyph(asset: provider.logoAsset, tint: provider.tint, size: 30)
+            Image(provider.logoAsset)
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 16, height: 16)
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
-                Text(account.displayName)
+                Text(store.accountLabel(for: account))
                     .voltControlLabel()
                 Text(provider.companyName)
                     .voltCaption()
             }
             Spacer(minLength: 0)
         }
-        .padding(10)
+        .padding(.vertical, 10)
         .frame(maxWidth: .infinity)
-        .background(VoltTheme.card, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(
-                    isDropTarget ? VoltTheme.primary.opacity(0.65) : VoltTheme.hairline,
-                    lineWidth: isDropTarget ? 1 : 0.5
-                )
-        }
+        .background(
+            isDropTarget ? VoltTheme.cardHover : Color.clear,
+            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+        )
         .contentShape(Rectangle())
         .draggable(account.id.uuidString)
         .dropDestination(for: String.self) { items, _ in
@@ -620,11 +640,34 @@ struct SettingsView: View {
                 store.reorderAccount(draggedID, toSlotOf: account.id)
             }
             return true
-        } isTargeted: { targeted in
-            dropTargetAccount = targeted ? account.id : (dropTargetAccount == account.id ? nil : dropTargetAccount)
+        } isTargeted: { isTargeted in
+            if isTargeted {
+                dropTargetAccount = account.id
+            } else if dropTargetAccount == account.id {
+                dropTargetAccount = nil
+            }
+        }
+        .contextMenu {
+            Button("Move Earlier") {
+                moveAccount(account.id, by: -1)
+            }
+            .disabled(!canMoveAccount(account.id, by: -1))
+
+            Button("Move Later") {
+                moveAccount(account.id, by: 1)
+            }
+            .disabled(!canMoveAccount(account.id, by: 1))
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(account.displayName), drag to reorder")
+        .accessibilityLabel(
+            "\(store.accountLabel(for: account)), position \(position) of \(store.accounts.count), drag to reorder"
+        )
+        .accessibilityAction(named: Text("Move Earlier")) {
+            moveAccount(account.id, by: -1)
+        }
+        .accessibilityAction(named: Text("Move Later")) {
+            moveAccount(account.id, by: 1)
+        }
     }
 
     private func securityRow(_ title: String, detail: String, symbol: String) -> some View {
@@ -641,44 +684,14 @@ struct SettingsView: View {
             }
             Spacer(minLength: 0)
         }
-    }
-
-    private func statusChip(title: String, color: Color, symbol: String) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: symbol)
-                .font(.system(size: 9, weight: .bold))
-            Text(title)
-                .lineLimit(1)
-        }
-        .voltChipText()
-        .foregroundStyle(color)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(color.opacity(0.12), in: Capsule())
+        .padding(.vertical, 10)
     }
 
     @ViewBuilder
     private func statusBanner(for account: ProviderAccount) -> some View {
         if let status = statuses[account.id],
            !(dirtyAccounts.contains(account.id) && status.kind == .success) {
-            let symbol: String = switch status.kind {
-            case .information: "info.circle.fill"
-            case .success: "checkmark.circle.fill"
-            case .error: "exclamationmark.triangle.fill"
-            }
-            let color: Color = switch status.kind {
-            case .information: VoltTheme.primary
-            case .success: VoltTheme.primary
-            case .error: .orange
-            }
-
-            Label(status.message, systemImage: symbol)
-                .voltChipText()
-                .foregroundStyle(color)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(11)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(color.opacity(0.1), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            VoltNotice(verbatim: status.message, kind: status.kind)
         }
     }
 
@@ -702,24 +715,37 @@ struct SettingsView: View {
 
             Spacer()
 
-            if dirtyAccounts.contains(accountID) {
-                Label("Unsaved changes", systemImage: "circle.fill")
-                    .voltChipText()
-                    .foregroundStyle(VoltTheme.primary)
-            }
-
-            Button(action: save) {
-                HStack(spacing: 7) {
-                    if testingAccounts.contains(accountID) {
-                        ProgressView().controlSize(.small)
-                    }
-                    Text(testingAccounts.contains(accountID) ? "Testing…" : "Save & Test")
+            VStack(alignment: .trailing, spacing: 5) {
+                if dirtyAccounts.contains(accountID) {
+                    Text("Unsaved changes")
+                        .voltFooterText()
+                        .foregroundStyle(.secondary)
                 }
-                .frame(minWidth: 78)
+
+                HStack(spacing: 8) {
+                    if dirtyAccounts.contains(accountID) {
+                        Button("Discard Changes") {
+                            discardChanges(for: account.provider)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(Color.secondary)
+                        .disabled(testingAccounts.contains(accountID))
+                    }
+
+                    Button(action: save) {
+                        HStack(spacing: 7) {
+                            if testingAccounts.contains(accountID) {
+                                ProgressView().controlSize(.small)
+                            }
+                            Text(testingAccounts.contains(accountID) ? "Testing…" : "Save & Test")
+                        }
+                        .frame(width: 96)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(VoltTheme.primary)
+                    .disabled(store.isLoading(accountID) || testingAccounts.contains(accountID))
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .tint(VoltTheme.primary)
-            .disabled(store.isLoading(accountID) || testingAccounts.contains(accountID))
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
@@ -752,17 +778,6 @@ struct SettingsView: View {
         return store.isConfigured(account.id)
             ? "Save & Test to verify the current credentials"
             : "Import credentials below to connect this provider"
-    }
-
-    private func connectionColor(for account: ProviderAccount) -> Color {
-        if store.error(for: account.id) != nil { return .orange }
-        if store.snapshot(for: account.id) != nil { return VoltTheme.primary }
-        if store.isConfigured(account.id)
-            || dirtyAccounts.contains(account.id)
-            || testingAccounts.contains(account.id) {
-            return VoltTheme.primary
-        }
-        return .secondary
     }
 
     // MARK: Credential state
@@ -827,13 +842,11 @@ struct SettingsView: View {
 
     private func loadClaudeCredentials() {
         guard let accountID = selectedClaudeAccountID,
-              let account = store.account(for: accountID)
+              store.account(for: accountID) != nil
         else { return }
         let wasLoaded = didLoadCredentials
         didLoadCredentials = false
         defer { didLoadCredentials = wasLoaded }
-        claudeAccountName = account.displayName
-        savedClaudeAccountName = account.displayName
         do {
             let credentials = try store.claudeCredentials(accountID: accountID)
             applyClaudeCredentials(credentials)
@@ -846,13 +859,11 @@ struct SettingsView: View {
 
     private func loadOpenAICredentials() {
         guard let accountID = selectedOpenAIAccountID,
-              let account = store.account(for: accountID)
+              store.account(for: accountID) != nil
         else { return }
         let wasLoaded = didLoadCredentials
         didLoadCredentials = false
         defer { didLoadCredentials = wasLoaded }
-        openAIAccountName = account.displayName
-        savedOpenAIAccountName = account.displayName
         do {
             let credentials = try store.openAICredentials(accountID: accountID)
             applyOpenAICredentials(credentials)
@@ -875,13 +886,8 @@ struct SettingsView: View {
         }
 
         do {
-            store.renameAccount(accountID, to: claudeAccountName)
             try store.saveClaude(credentials, accountID: accountID)
             savedClaudeCredentials = credentials
-            savedClaudeAccountName = store.account(for: accountID)?.displayName
-                ?? normalizedName(claudeAccountName)
-            claudeAccountName = savedClaudeAccountName
-            let savedName = savedClaudeAccountName
             dirtyAccounts.remove(accountID)
             testingAccounts.insert(accountID)
             statuses[accountID] = SettingsStatus(
@@ -894,7 +900,6 @@ struct SettingsView: View {
                 if succeeded, store.snapshot(for: accountID) != nil {
                     if let refreshed = try? store.claudeCredentials(accountID: accountID) {
                         let draftWasUnchanged = draftClaudeCredentials == credentials
-                            && normalizedName(claudeAccountName) == savedName
                         savedClaudeCredentials = normalizedClaude(refreshed)
                         if draftWasUnchanged, selectedClaudeAccountID == accountID {
                             applyClaudeCredentials(refreshed)
@@ -933,13 +938,8 @@ struct SettingsView: View {
         }
 
         do {
-            store.renameAccount(accountID, to: openAIAccountName)
             try store.saveOpenAI(credentials, accountID: accountID)
             savedOpenAICredentials = credentials
-            savedOpenAIAccountName = store.account(for: accountID)?.displayName
-                ?? normalizedName(openAIAccountName)
-            openAIAccountName = savedOpenAIAccountName
-            let savedName = savedOpenAIAccountName
             dirtyAccounts.remove(accountID)
             testingAccounts.insert(accountID)
             statuses[accountID] = SettingsStatus(
@@ -952,7 +952,6 @@ struct SettingsView: View {
                 if succeeded, store.snapshot(for: accountID) != nil {
                     if let refreshed = try? store.openAICredentials(accountID: accountID) {
                         let draftWasUnchanged = draftOpenAICredentials == credentials
-                            && normalizedName(openAIAccountName) == savedName
                         savedOpenAICredentials = normalizedOpenAI(refreshed)
                         if draftWasUnchanged, selectedOpenAIAccountID == accountID {
                             applyOpenAICredentials(refreshed)
@@ -1021,9 +1020,6 @@ struct SettingsView: View {
             openAIIDToken = credentials.idToken
             openAIAccountID = credentials.accountID
             openAILastRefresh = credentials.lastRefresh
-            if openAIAccountName.hasPrefix("OpenAI"), let email = credentials.accountEmail {
-                openAIAccountName = email
-            }
             statuses[accountID] = SettingsStatus(
                 message: "Imported Codex credentials. Select Save & Test to connect.",
                 kind: .information
@@ -1102,7 +1098,7 @@ struct SettingsView: View {
             }
             dirtyAccounts.remove(accountID)
             statuses[accountID] = SettingsStatus(
-                message: "\(account.displayName) disconnected.",
+                message: "\(store.accountLabel(for: account)) disconnected.",
                 kind: .success
             )
         } catch {
@@ -1170,13 +1166,19 @@ struct SettingsView: View {
         )
     }
 
-    private func accountNameBinding(for provider: AIProvider) -> Binding<String> {
-        provider == .anthropic ? $claudeAccountName : $openAIAccountName
+    private func canMoveAccount(_ accountID: UUID, by offset: Int) -> Bool {
+        guard let index = store.accounts.firstIndex(where: { $0.id == accountID }) else { return false }
+        return store.accounts.indices.contains(index + offset)
     }
 
-    private func normalizedName(_ value: String) -> String {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "Account" : trimmed
+    private func moveAccount(_ accountID: UUID, by offset: Int) {
+        guard let index = store.accounts.firstIndex(where: { $0.id == accountID }),
+              store.accounts.indices.contains(index + offset)
+        else { return }
+        let targetID = store.accounts[index + offset].id
+        withAnimation(.easeOut(duration: 0.18)) {
+            store.reorderAccount(accountID, toSlotOf: targetID)
+        }
     }
 }
 
@@ -1201,7 +1203,6 @@ private struct SecretInput: View {
             } label: {
                 Image(systemName: isRevealed ? "eye.slash" : "eye")
                     .frame(width: 26, height: 26)
-                    .background(VoltTheme.card, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)

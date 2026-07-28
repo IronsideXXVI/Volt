@@ -3,17 +3,38 @@ import Foundation
 struct ProviderAccount: Codable, Equatable, Hashable, Identifiable, Sendable {
     let id: UUID
     let provider: AIProvider
-    var name: String
 
-    init(id: UUID = UUID(), provider: AIProvider, name: String) {
+    init(id: UUID = UUID(), provider: AIProvider) {
         self.id = id
         self.provider = provider
-        self.name = name
     }
 
-    var displayName: String {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? provider.displayName : trimmed
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case provider
+        case name
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        provider = try container.decode(AIProvider.self, forKey: .provider)
+
+        // Older Volt builds stored a user-editable tab name here. Decode the
+        // field for compatibility but intentionally discard it: account
+        // presentation is now derived from the account's global drawer order.
+        _ = try? container.decodeIfPresent(String.self, forKey: .name)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(provider, forKey: .provider)
+
+        // Keep the legacy key populated with a generic provider name so a
+        // downgrade can still decode the account profile without losing its
+        // UUID, while never restoring a discarded custom label.
+        try container.encode(provider.displayName, forKey: .name)
     }
 }
 

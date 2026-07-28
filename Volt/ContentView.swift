@@ -4,8 +4,12 @@ import SwiftUI
 struct ContentView: View {
     @Environment(UsageStore.self) private var store
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var contentHeight: CGFloat = 0
+    @State private var accountSwitcherIsVisible = false
+    @State private var accountStripWidth: CGFloat = 0
+    @State private var didRevealInitialAccount = false
 
     private let width: CGFloat = 360
     private let maxContentHeight: CGFloat = 520
@@ -89,50 +93,122 @@ struct ContentView: View {
         let visibleTabCount = CGFloat(min(max(store.accounts.count, 1), 3))
         let tabWidth = (326 - (visibleTabCount - 1) * 3) / visibleTabCount
 
-        return ScrollView(.horizontal) {
-            HStack(spacing: 3) {
-                ForEach(store.accounts) { account in
-                    let isSelected = selection.wrappedValue == account.id
-                    Button {
-                        withAnimation(.easeOut(duration: 0.16)) {
+        return ScrollViewReader { proxy in
+            ScrollView(.horizontal) {
+                HStack(spacing: 3) {
+                    ForEach(store.accounts) { account in
+                        let isSelected = selection.wrappedValue == account.id
+                        let accountLabel = store.accountLabel(for: account.id)
+
+                        Button {
                             selection.wrappedValue = account.id
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(account.provider.logoAsset)
-                                .renderingMode(.template)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 15, height: 15)
-                            Text(account.displayName)
-                                .voltTabLabel(selected: isSelected)
-                                .lineLimit(1)
-                        }
-                        .foregroundStyle(isSelected ? .primary : .secondary)
-                        .padding(.horizontal, 11)
-                        .frame(width: tabWidth)
-                        .frame(minHeight: 32)
-                        .background {
-                            if isSelected {
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .fill(VoltTheme.cardHover)
-                                    .overlay {
-                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                            .strokeBorder(VoltTheme.hairline, lineWidth: 0.5)
-                                    }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(account.provider.logoAsset)
+                                    .renderingMode(.template)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 15, height: 15)
+
+                                Text(drawerTabLabel(for: account))
+                                    .voltTabLabel(selected: isSelected)
+                                    .lineLimit(1)
                             }
+                            .foregroundStyle(isSelected ? .primary : .secondary)
+                            .padding(.horizontal, 7)
+                            .frame(width: tabWidth)
+                            .frame(minHeight: 32)
+                            .background {
+                                if isSelected {
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .fill(VoltTheme.cardHover)
+                                        .overlay {
+                                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                                .strokeBorder(VoltTheme.hairline, lineWidth: 0.5)
+                                        }
+                                }
+                            }
+                            .contentShape(Rectangle())
                         }
-                        .contentShape(Rectangle())
+                        .buttonStyle(.plain)
+                        .help("Show \(accountLabel) usage")
+                        .accessibilityLabel("Show \(accountLabel) usage")
+                        .accessibilityAddTraits(isSelected ? .isSelected : [])
+                        .id(account.id)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Show \(account.displayName) usage")
-                    .accessibilityAddTraits(isSelected ? .isSelected : [])
+                }
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(3)
+                .background {
+                    GeometryReader { proxy in
+                        Color.clear.preference(
+                            key: AccountStripWidthKey.self,
+                            value: proxy.size.width
+                        )
+                    }
                 }
             }
-            .padding(3)
+            .scrollIndicators(.hidden)
+            .background(VoltTheme.card, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+            .onAppear {
+                accountSwitcherIsVisible = true
+                didRevealInitialAccount = false
+                revealInitialAccountIfReady(selection.wrappedValue, in: proxy)
+            }
+            .onDisappear {
+                accountSwitcherIsVisible = false
+                accountStripWidth = 0
+                didRevealInitialAccount = false
+            }
+            .onPreferenceChange(AccountStripWidthKey.self) { stripWidth in
+                accountStripWidth = stripWidth
+                revealInitialAccountIfReady(selection.wrappedValue, in: proxy)
+            }
+            .onChange(of: selection.wrappedValue) { _, accountID in
+                guard accountSwitcherIsVisible else { return }
+                revealAccount(accountID, in: proxy, animated: true)
+            }
+            .onChange(of: store.accounts.map(\.id)) { _, _ in
+                guard accountSwitcherIsVisible else { return }
+                revealAccount(selection.wrappedValue, in: proxy, animated: true)
+            }
         }
-        .scrollIndicators(.hidden)
-        .background(VoltTheme.card, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+    }
+
+    private func drawerTabLabel(for account: ProviderAccount) -> String {
+        guard store.showsAccountNumbers,
+              let ordinal = store.accountOrdinal(for: account)
+        else {
+            return account.provider.displayName
+        }
+        return "\(account.provider.displayName) \(ordinal)"
+    }
+
+    private func revealInitialAccountIfReady(_ accountID: UUID, in proxy: ScrollViewProxy) {
+        guard accountSwitcherIsVisible,
+              !didRevealInitialAccount,
+              accountStripWidth > 0,
+              store.accounts.contains(where: { $0.id == accountID })
+        else { return }
+
+        didRevealInitialAccount = true
+        revealAccount(accountID, in: proxy, animated: false)
+    }
+
+    private func revealAccount(_ accountID: UUID, in proxy: ScrollViewProxy, animated: Bool) {
+        guard store.accounts.contains(where: { $0.id == accountID }) else { return }
+
+        if animated && !reduceMotion {
+            withAnimation(.easeOut(duration: 0.16)) {
+                proxy.scrollTo(accountID, anchor: .center)
+            }
+        } else {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                proxy.scrollTo(accountID, anchor: .center)
+            }
+        }
     }
 
     // MARK: Content router
@@ -183,17 +259,19 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             if let error = store.error(for: accountID) {
-                banner(error, color: .orange, symbol: "exclamationmark.triangle.fill", prefix: "Showing the last update. ")
+                VoltNotice(verbatim: "Showing the last update. \(error)", kind: .warning)
             }
 
             ForEach(otherNotices) { notice in
-                noticeView(notice)
+                VoltNotice(notice.message, kind: notice.kind.voltNoticeKind)
             }
 
             // When there's no weekly-limits section to attach them to, still
             // surface the Claude boost banner and learn-more link.
             if isClaude && !hasWeeklySection {
-                ForEach(boostNotices) { noticeView($0) }
+                ForEach(boostNotices) { notice in
+                    VoltNotice(notice.message, kind: notice.kind.voltNoticeKind)
+                }
                 learnMoreLink
             }
 
@@ -217,34 +295,14 @@ struct ContentView: View {
         }
     }
 
-    /// Renders inline Markdown. Links are tinted with the Volt accent and
-    /// underlined. `base` colors the whole string; `lead` colors the API's
-    /// strongly-emphasized run (e.g. a banner's first sentence) without bolding
-    /// it. When `base` is nil, the surrounding `foregroundStyle` applies.
-    private func styledMarkdown(
-        _ string: String,
-        size: CGFloat = 11,
-        weight: Font.Weight = .medium,
-        base: Color? = nil,
-        lead: Color? = nil
-    ) -> AttributedString {
+    /// Renders inline Markdown used outside notices. Links keep Volt's accent;
+    /// `VoltNotice` intentionally applies its own all-secondary link contract.
+    private func styledMarkdown(_ string: String) -> AttributedString {
         var attributed = (try? AttributedString(
             markdown: string,
             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
         )) ?? AttributedString(string)
 
-        attributed.font = .system(size: size, weight: weight)
-        if let base {
-            attributed.foregroundColor = base
-        }
-        if let lead {
-            let leadRanges = attributed.runs
-                .filter { $0.inlinePresentationIntent?.contains(.stronglyEmphasized) == true }
-                .map(\.range)
-            for range in leadRanges {
-                attributed[range].foregroundColor = lead
-            }
-        }
         let linkRanges = attributed.runs.filter { $0.link != nil }.map(\.range)
         for range in linkRanges {
             attributed[range].underlineStyle = .single
@@ -258,6 +316,7 @@ struct ContentView: View {
         Text(styledMarkdown(
             "[Learn more about usage limits](https://support.claude.com/en/articles/11647753-understanding-usage-and-length-limits)"
         ))
+        .voltCaption()
         .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -275,13 +334,15 @@ struct ContentView: View {
                         .voltSectionHeader()
                     if let subtitle = section.subtitle {
                         Text(styledMarkdown(subtitle))
-                            .foregroundStyle(.secondary)
+                            .voltCaption()
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
 
-            ForEach(boostNotices) { noticeView($0) }
+            ForEach(boostNotices) { notice in
+                VoltNotice(notice.message, kind: notice.kind.voltNoticeKind)
+            }
             if showLearnMore {
                 learnMoreLink
             }
@@ -299,7 +360,7 @@ struct ContentView: View {
                     .voltSectionHeader()
                 if let subtitle = section.subtitle {
                     Text(styledMarkdown(subtitle))
-                        .foregroundStyle(.secondary)
+                        .voltCaption()
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -317,8 +378,7 @@ struct ContentView: View {
                                 .voltCaption()
                             if let detail = item.detail {
                                 Text(detail)
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(.tertiary)
+                                    .voltCaption()
                             }
                         }
                         Spacer(minLength: 8)
@@ -348,48 +408,6 @@ struct ContentView: View {
         .padding(.vertical, 26)
     }
 
-    // MARK: Banners & notices
-
-    private func noticeView(_ notice: UsageNotice) -> some View {
-        let isInfo = notice.kind == .information
-        let isError = notice.kind == .error
-        let foreground: Color = isError ? .red : .secondary
-        let symbol = isInfo ? "info.circle.fill" : "exclamationmark.triangle.fill"
-        return HStack(alignment: .top, spacing: 8) {
-            Image(systemName: symbol)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(foreground)
-                .padding(.top, 1)
-            Text(styledMarkdown(
-                notice.message,
-                base: foreground,
-                lead: isError ? .red : .primary
-            ))
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(isError ? Color.red.opacity(0.09) : VoltTheme.card,
-                    in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-        .overlay {
-            if !isError {
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .strokeBorder(VoltTheme.hairline, lineWidth: 0.5)
-            }
-        }
-    }
-
-    private func banner(_ message: String, color: Color, symbol: String, prefix: String = "") -> some View {
-        Label(prefix + message, systemImage: symbol)
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(color)
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(color.opacity(0.09), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-    }
-
     // MARK: States
 
     private var loadingView: some View {
@@ -406,11 +424,12 @@ struct ContentView: View {
 
     private func unconfiguredView(_ account: ProviderAccount) -> some View {
         let provider = account.provider
+        let accountLabel = store.accountLabel(for: account.id)
         return VStack(spacing: 14) {
             VoltGlyph(symbol: "key.fill", tint: provider.tint, size: 46)
 
             VStack(spacing: 5) {
-                Text("Connect \(account.displayName)")
+                Text("Connect \(accountLabel)")
                     .voltStateTitle()
                 Text(configurationInstructions(for: provider))
                     .voltCaption()
@@ -419,7 +438,7 @@ struct ContentView: View {
             }
 
             Button(action: showSettings) {
-                Text("Set up \(account.displayName)")
+                Text("Set up \(accountLabel)")
                     .frame(minWidth: 120)
             }
             .buttonStyle(.borderedProminent)
@@ -436,11 +455,12 @@ struct ContentView: View {
 
     private func errorView(_ message: String, account: ProviderAccount) -> some View {
         let provider = account.provider
+        let accountLabel = store.accountLabel(for: account.id)
         return VStack(spacing: 12) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 24))
                 .foregroundStyle(.orange)
-            Text("Couldn't load \(account.displayName)")
+            Text("Couldn't load \(accountLabel)")
                 .voltStateTitle()
             Text(message)
                 .voltCaption()
@@ -552,5 +572,25 @@ private struct ContentHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = max(value, nextValue())
+    }
+}
+
+private struct AccountStripWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+private extension UsageNotice.Kind {
+    var voltNoticeKind: VoltNoticeKind {
+        switch self {
+        case .information:
+            return .information
+        case .warning:
+            return .warning
+        case .error:
+            return .error
+        }
     }
 }

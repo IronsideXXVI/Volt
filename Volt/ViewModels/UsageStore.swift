@@ -6,9 +6,16 @@ import Observation
 final class UsageStore {
     private static let selectedAccountKey = "selectedAccountID"
     private static let accountsKey = "providerAccounts"
+    private static let showsAccountNumbersKey = "showsAccountNumbers"
     private static let legacySelectedProviderKey = "selectedProvider"
     private static let legacyProviderOrderKey = "providerOrder"
     private let defaults: UserDefaults
+
+    var showsAccountNumbers: Bool {
+        didSet {
+            defaults.set(showsAccountNumbers, forKey: Self.showsAccountNumbersKey)
+        }
+    }
 
     var selectedAccountID: UUID {
         didSet {
@@ -34,13 +41,19 @@ final class UsageStore {
 
     init(defaults: UserDefaults = .standard, migrateCredentials: Bool = true) {
         self.defaults = defaults
+        let initialShowsAccountNumbers = defaults.object(forKey: Self.showsAccountNumbersKey) == nil
+            ? true
+            : defaults.bool(forKey: Self.showsAccountNumbersKey)
+        showsAccountNumbers = initialShowsAccountNumbers
+        defaults.set(initialShowsAccountNumbers, forKey: Self.showsAccountNumbersKey)
+
         let savedAccounts: [ProviderAccount]
         if let data = defaults.data(forKey: Self.accountsKey),
            let decoded = try? JSONDecoder().decode([ProviderAccount].self, from: data),
            !decoded.isEmpty {
             var normalized = decoded
             for provider in AIProvider.allCases where !normalized.contains(where: { $0.provider == provider }) {
-                normalized.append(ProviderAccount(provider: provider, name: provider.displayName))
+                normalized.append(ProviderAccount(provider: provider))
             }
             savedAccounts = normalized
         } else {
@@ -84,6 +97,25 @@ final class UsageStore {
         accounts.filter { $0.provider == provider }
     }
 
+    func accountOrdinal(for accountID: UUID) -> Int? {
+        accounts.firstIndex(where: { $0.id == accountID }).map { $0 + 1 }
+    }
+
+    func accountOrdinal(for account: ProviderAccount) -> Int? {
+        accountOrdinal(for: account.id)
+    }
+
+    func accountLabel(for accountID: UUID) -> String {
+        guard let index = accounts.firstIndex(where: { $0.id == accountID }) else {
+            return "Account"
+        }
+        return "\(accounts[index].provider.displayName) account \(index + 1)"
+    }
+
+    func accountLabel(for account: ProviderAccount) -> String {
+        accountLabel(for: account.id)
+    }
+
     func snapshot(for accountID: UUID) -> ProviderUsageSnapshot? {
         snapshots[accountID]
     }
@@ -102,25 +134,10 @@ final class UsageStore {
 
     @discardableResult
     func addAccount(provider: AIProvider) -> ProviderAccount {
-        let providerAccounts = accounts(for: provider)
-        let existingNames = Set(providerAccounts.map(\.displayName))
-        var suffix = 2
-        while existingNames.contains("\(provider.displayName) \(suffix)") {
-            suffix += 1
-        }
-        let account = ProviderAccount(
-            provider: provider,
-            name: providerAccounts.isEmpty ? provider.displayName : "\(provider.displayName) \(suffix)"
-        )
+        let account = ProviderAccount(provider: provider)
         accounts.append(account)
         selectedAccountID = account.id
         return account
-    }
-
-    func renameAccount(_ accountID: UUID, to name: String) {
-        guard let index = accounts.firstIndex(where: { $0.id == accountID }) else { return }
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        accounts[index].name = trimmed.isEmpty ? accounts[index].provider.displayName : trimmed
     }
 
     func reorderAccount(_ accountID: UUID, toSlotOf targetID: UUID) {
@@ -292,7 +309,7 @@ final class UsageStore {
         for provider in AIProvider.allCases where !providerOrder.contains(provider) {
             providerOrder.append(provider)
         }
-        return providerOrder.map { ProviderAccount(provider: $0, name: $0.displayName) }
+        return providerOrder.map { ProviderAccount(provider: $0) }
     }
 
     private static let emptyOpenAICredentials = OpenAICredentials(

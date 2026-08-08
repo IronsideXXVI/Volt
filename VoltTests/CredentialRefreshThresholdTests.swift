@@ -1,16 +1,16 @@
 import XCTest
 @testable import Volt
 
-/// Documents the gap that `forceTokenRefresh` closes.
+/// Pins when an OpenAI credential is considered due for a token exchange.
 ///
-/// `codex login` mints a refresh token and an access token that stays valid for
-/// days. OpenAI revokes the refresh token issued by the previous `codex login`
-/// on a machine, so a second login -- even for an unrelated account -- kills the
-/// first one's token. Volt only refreshes within five minutes of expiry, so an
-/// imported credential would otherwise sit on that revocable login token for its
-/// entire lifetime. Exchanging it once at import time moves Volt onto a
-/// descendant token, which a later login leaves alone.
-final class ImportedCredentialRotationTests: XCTestCase {
+/// The threshold is deliberately narrow. Volt and Codex hold the same refresh
+/// token immediately after an `auth.json` import, and a refresh token may only
+/// be redeemed once -- so any exchange Volt performs spends the copy still on
+/// disk in `~/.codex`. Refreshing only at the edge of expiry keeps that window
+/// small; refreshing eagerly would spend Codex's copy immediately and invite
+/// reuse detection to revoke the whole family. Anyone importing a credential
+/// should re-run `codex login` so the two clients stop sharing a session.
+final class CredentialRefreshThresholdTests: XCTestCase {
     /// Builds an unsigned JWT whose payload carries the given expiry, matching
     /// what `JWT.payload(from:)` reads.
     private func accessToken(expiringIn interval: TimeInterval) -> String {
@@ -33,22 +33,21 @@ final class ImportedCredentialRotationTests: XCTestCase {
         )
     }
 
-    /// The vulnerability window: a credential straight out of `codex login` is
-    /// not due for refresh, so without an explicit rotation it keeps the exact
-    /// token a later login revokes.
-    func testFreshlyImportedCredentialIsNotDueForRefresh() {
+    /// A credential with life left in it must be left alone, so Volt does not
+    /// spend a refresh token that Codex is still relying on.
+    func testCredentialWithTimeRemainingIsNotRefreshed() {
         XCTAssertFalse(credentials(expiringIn: 10 * 24 * 60 * 60).shouldRefresh)
         XCTAssertFalse(credentials(expiringIn: 60 * 60).shouldRefresh)
     }
 
-    func testCredentialNearingExpiryIsDueForRefresh() {
+    func testCredentialNearingExpiryIsRefreshed() {
         XCTAssertTrue(credentials(expiringIn: 60).shouldRefresh)
         XCTAssertTrue(credentials(expiringIn: -60).shouldRefresh)
     }
 
-    /// A forced refresh must never be attempted without something to exchange,
-    /// so access-token-only setups keep working.
-    func testCredentialWithoutRefreshTokenIsNeverDueForRefresh() {
+    /// Access-token-only setups have nothing to exchange and must never be
+    /// treated as refreshable.
+    func testCredentialWithoutRefreshTokenIsNeverRefreshed() {
         let manual = OpenAICredentials(
             accessToken: accessToken(expiringIn: -60),
             refreshToken: "",

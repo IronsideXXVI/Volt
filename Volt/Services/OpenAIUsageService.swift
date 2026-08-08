@@ -948,16 +948,14 @@ enum OpenAIUsageService {
         let credentials: OpenAICredentials
     }
 
-    /// - Parameter forceTokenRefresh: Rotate the refresh token before fetching,
-    ///   even when the access token is still valid. Used right after an import.
-    ///   OpenAI revokes the refresh token minted by the previous `codex login`
-    ///   on a machine, so a credential that is imported and then left unrotated
-    ///   can be invalidated by a later, unrelated login. Exchanging it once puts
-    ///   Volt on a descendant token that a subsequent login does not disturb.
-    static func fetch(
-        credentials originalCredentials: OpenAICredentials,
-        forceTokenRefresh: Bool = false
-    ) async throws -> Result {
+    /// Rotates the token only when it is close to expiring. Deliberately does
+    /// not rotate on import: Volt and Codex hold the same refresh token right
+    /// after an `auth.json` import, so an eager exchange would spend the copy
+    /// Codex still has on disk. Codex would then present a used token on its
+    /// next refresh, and reuse detection can revoke the whole token family --
+    /// breaking the CLI and Volt together. Whoever imports should re-run
+    /// `codex login` so the two stop sharing a session.
+    static func fetch(credentials originalCredentials: OpenAICredentials) async throws -> Result {
         guard originalCredentials.isComplete else {
             throw UsageServiceError.notConfigured(.openAI)
         }
@@ -965,11 +963,6 @@ enum OpenAIUsageService {
         var credentials = originalCredentials
         if credentials.shouldRefresh {
             credentials = try await refresh(credentials)
-        } else if forceTokenRefresh, !credentials.refreshToken.isEmpty {
-            // Best effort: a credential entered by hand as an access token only,
-            // or a refresh endpoint having a bad day, must not block the import.
-            // A genuinely dead token still surfaces below on the usage request.
-            credentials = (try? await refresh(credentials)) ?? credentials
         }
 
         let data: Data

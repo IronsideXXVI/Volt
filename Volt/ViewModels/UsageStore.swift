@@ -181,12 +181,8 @@ final class UsageStore {
         }
     }
 
-    /// - Parameter forceTokenRefresh: Ask the provider to rotate the stored
-    ///   refresh token before fetching, even when the access token is still
-    ///   valid. Set by the Settings connection test so a freshly imported
-    ///   credential never sits on the token its `codex login` minted.
     @discardableResult
-    func refresh(_ accountID: UUID, forceTokenRefresh: Bool = false) async -> Bool {
+    func refresh(_ accountID: UUID) async -> Bool {
         if loadingAccounts.contains(accountID) {
             return await waitForRefreshCompletion(accountID)
         }
@@ -216,10 +212,7 @@ final class UsageStore {
                 guard let credentials = try CredentialStore.loadOpenAI(accountID: accountID) else {
                     throw UsageServiceError.notConfigured(account.provider)
                 }
-                let result = try await OpenAIUsageService.fetch(
-                    credentials: credentials,
-                    forceTokenRefresh: forceTokenRefresh
-                )
+                let result = try await OpenAIUsageService.fetch(credentials: credentials)
                 snapshot = result.snapshot
                 if result.credentials != credentials {
                     try CredentialStore.saveOpenAI(result.credentials, accountID: accountID)

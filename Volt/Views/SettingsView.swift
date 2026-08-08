@@ -947,9 +947,7 @@ struct SettingsView: View {
                 kind: .information
             )
             Task {
-                // Rotate off the imported login token as part of connecting, so
-                // a later `codex login` for another account cannot revoke it.
-                let succeeded = await store.refresh(accountID, forceTokenRefresh: true)
+                let succeeded = await store.refresh(accountID)
                 testingAccounts.remove(accountID)
                 if succeeded, store.snapshot(for: accountID) != nil {
                     if let refreshed = try? store.openAICredentials(accountID: accountID) {

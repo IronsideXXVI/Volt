@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Volt 0.1.25 release notes</title>
+  <style>
+    body { color: #1f2328; font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0 auto; max-width: 760px; padding: 32px 24px; }
+    a { color: #0969da; }
+    code { background: #f6f8fa; border-radius: 4px; padding: 0.15em 0.35em; }
+    pre { background: #f6f8fa; border-radius: 6px; overflow: auto; padding: 16px; }
+    @media (prefers-color-scheme: dark) { body { background: #0d1117; color: #e6edf3; } a { color: #58a6ff; } code, pre { background: #161b22; } }
+  </style>
+</head>
+<body>
+<h1>Volt 0.1.25</h1>
+<p dir="auto">Two credential bugs that made a working account look broken.</p>
+<p dir="auto"><code class="notranslate">codex login</code> mints a refresh token alongside an access token valid for<br>
+days. OpenAI revokes the refresh token issued by the previous<br>
+<code class="notranslate">codex login</code> on a machine, so a second login -- even for an unrelated<br>
+account -- kills the first one's token. Volt only refreshes within five<br>
+minutes of expiry, so an imported credential sat on that revocable login<br>
+token for its whole lifetime and died the next time the user signed in to<br>
+another account. Save &amp; Test now forces one refresh, moving Volt onto a<br>
+descendant token that a later login leaves alone. The exchange is best<br>
+effort, so access-token-only setups and a flaky refresh endpoint still<br>
+import successfully.</p>
+<p dir="auto">Separately, the usage request treated 401 and 403 identically. A 403 from<br>
+the ChatGPT backend is routinely bot protection or a blocked network path,<br>
+but it surfaced as "OpenAI rejected the saved credentials", sending users<br>
+to re-import a perfectly valid token. 403 now maps to a plain server error<br>
+and keeps its refresh-and-retry, while only a 401 reports rejected<br>
+credentials.</p>
+<p dir="auto">Co-Authored-By: Claude Opus 5 <a href="mailto:noreply@anthropic.com">noreply@anthropic.com</a></p>
+<p dir="auto"><strong>Full commit history:</strong> <a href="https://github.com/IronsideXXVI/Volt/compare/v0.1.24...v0.1.25">v0.1.24 to v0.1.25</a></p></body>
+</html>

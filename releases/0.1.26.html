@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Volt 0.1.26 release notes</title>
+  <style>
+    body { color: #1f2328; font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0 auto; max-width: 760px; padding: 32px 24px; }
+    a { color: #0969da; }
+    code { background: #f6f8fa; border-radius: 4px; padding: 0.15em 0.35em; }
+    pre { background: #f6f8fa; border-radius: 6px; overflow: auto; padding: 16px; }
+    @media (prefers-color-scheme: dark) { body { background: #0d1117; color: #e6edf3; } a { color: #58a6ff; } code, pre { background: #161b22; } }
+  </style>
+</head>
+<body>
+<h1>Volt 0.1.26</h1>
+<p dir="auto">Reverts the forced rotation added in 0.1.25. It was justified by a theory<br>
+that testing disproved, and it makes things worse rather than merely being<br>
+inert.</p>
+<p dir="auto">The claim was that OpenAI revokes the refresh token minted by the previous<br>
+<code class="notranslate">codex login</code> on a machine, so rotating onto a descendant would escape it.<br>
+Neither half held up. A login does not revoke earlier grants -- three<br>
+sessions authenticated on different days, two of them for the same<br>
+account, coexist happily on one installation. And a credential that was<br>
+rotated exactly as intended was invalidated anyway.</p>
+<p dir="auto">What actually breaks a credential is two clients sharing one refresh<br>
+chain. A refresh token may only be redeemed once, and Volt holds the same<br>
+one as <code class="notranslate">~/.codex</code> immediately after an import. Rotating on import spends<br>
+Codex's on-disk copy right away, so the CLI presents a used token on its<br>
+next refresh and reuse detection can revoke the whole family -- taking<br>
+Volt and the CLI down together. Refreshing only near expiry leaves that<br>
+copy usable. The real remedy is procedural: re-run <code class="notranslate">codex login</code> after<br>
+importing so the two clients stop sharing a session.</p>
+<p dir="auto">The 401/403 split from 0.1.25 is unaffected and stays. Both revocations<br>
+observed returned 401, confirming that mapping; 403 remains a transport<br>
+condition that must not be reported as rejected credentials.</p>
+<p dir="auto">The refresh-threshold tests are kept and reframed around the constraint<br>
+that actually motivates the narrow window.</p>
+<p dir="auto">Co-Authored-By: Claude Opus 5 <a href="mailto:noreply@anthropic.com">noreply@anthropic.com</a></p>
+<p dir="auto"><strong>Full commit history:</strong> <a href="https://github.com/IronsideXXVI/Volt/compare/v0.1.25...v0.1.26">v0.1.25 to v0.1.26</a></p></body>
+</html>

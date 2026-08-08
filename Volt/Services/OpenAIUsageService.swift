@@ -380,11 +380,42 @@ private extension KeyedDecodingContainer {
     }
 }
 
-private enum OpenAIRequestError: Error {
+enum OpenAIRequestError: Error {
     case unauthorized
+    case forbidden
     case rateLimited(Date?)
     case status(Int)
     case invalidResponse
+
+    /// Whether a freshly minted access token could plausibly clear the failure,
+    /// making one refresh-and-retry worthwhile.
+    var isRetryableWithFreshToken: Bool {
+        switch self {
+        case .unauthorized, .forbidden:
+            return true
+        case .rateLimited, .status, .invalidResponse:
+            return false
+        }
+    }
+
+    /// The error surfaced once a retry has already been spent. Only a 401 means
+    /// the credentials themselves were rejected; a 403 from the ChatGPT backend
+    /// is routinely bot protection or a blocked network path, so it must not be
+    /// reported as a credential problem.
+    var usageServiceError: UsageServiceError {
+        switch self {
+        case .unauthorized:
+            return .invalidCredentials(.openAI)
+        case .forbidden:
+            return .server(.openAI, 403)
+        case let .rateLimited(retryAfter):
+            return .rateLimited(.openAI, retryAfter)
+        case let .status(status):
+            return .server(.openAI, status)
+        case .invalidResponse:
+            return .invalidResponse(.openAI)
+        }
+    }
 }
 
 enum OpenAIUsageNormalizer {
@@ -917,7 +948,16 @@ enum OpenAIUsageService {
         let credentials: OpenAICredentials
     }
 
-    static func fetch(credentials originalCredentials: OpenAICredentials) async throws -> Result {
+    /// - Parameter forceTokenRefresh: Rotate the refresh token before fetching,
+    ///   even when the access token is still valid. Used right after an import.
+    ///   OpenAI revokes the refresh token minted by the previous `codex login`
+    ///   on a machine, so a credential that is imported and then left unrotated
+    ///   can be invalidated by a later, unrelated login. Exchanging it once puts
+    ///   Volt on a descendant token that a subsequent login does not disturb.
+    static func fetch(
+        credentials originalCredentials: OpenAICredentials,
+        forceTokenRefresh: Bool = false
+    ) async throws -> Result {
         guard originalCredentials.isComplete else {
             throw UsageServiceError.notConfigured(.openAI)
         }
@@ -925,32 +965,27 @@ enum OpenAIUsageService {
         var credentials = originalCredentials
         if credentials.shouldRefresh {
             credentials = try await refresh(credentials)
+        } else if forceTokenRefresh, !credentials.refreshToken.isEmpty {
+            // Best effort: a credential entered by hand as an access token only,
+            // or a refresh endpoint having a bad day, must not block the import.
+            // A genuinely dead token still surfaces below on the usage request.
+            credentials = (try? await refresh(credentials)) ?? credentials
         }
 
         let data: Data
         do {
             data = try await requestUsage(credentials: credentials)
-        } catch OpenAIRequestError.unauthorized where !credentials.refreshToken.isEmpty {
+        } catch let error as OpenAIRequestError
+            where error.isRetryableWithFreshToken && !credentials.refreshToken.isEmpty
+        {
             credentials = try await refresh(credentials)
             do {
                 data = try await requestUsage(credentials: credentials)
-            } catch OpenAIRequestError.unauthorized {
-                throw UsageServiceError.invalidCredentials(.openAI)
-            } catch OpenAIRequestError.invalidResponse {
-                throw UsageServiceError.invalidResponse(.openAI)
-            } catch OpenAIRequestError.rateLimited(let retryAfter) {
-                throw UsageServiceError.rateLimited(.openAI, retryAfter)
-            } catch OpenAIRequestError.status(let status) {
-                throw UsageServiceError.server(.openAI, status)
+            } catch let retryError as OpenAIRequestError {
+                throw retryError.usageServiceError
             }
-        } catch OpenAIRequestError.unauthorized {
-            throw UsageServiceError.invalidCredentials(.openAI)
-        } catch OpenAIRequestError.invalidResponse {
-            throw UsageServiceError.invalidResponse(.openAI)
-        } catch OpenAIRequestError.rateLimited(let retryAfter) {
-            throw UsageServiceError.rateLimited(.openAI, retryAfter)
-        } catch OpenAIRequestError.status(let status) {
-            throw UsageServiceError.server(.openAI, status)
+        } catch let error as OpenAIRequestError {
+            throw error.usageServiceError
         }
 
         let snapshot = try OpenAIUsageNormalizer.snapshot(from: data, credentials: credentials)
@@ -975,8 +1010,10 @@ enum OpenAIUsageService {
         switch response.statusCode {
         case 200..<300:
             return data
-        case 401, 403:
+        case 401:
             throw OpenAIRequestError.unauthorized
+        case 403:
+            throw OpenAIRequestError.forbidden
         case 429:
             throw OpenAIRequestError.rateLimited(retryAfterDate(from: response))
         default:

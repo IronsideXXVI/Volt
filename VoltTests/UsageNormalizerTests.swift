@@ -74,6 +74,23 @@ final class UsageNormalizerTests: XCTestCase {
         XCTAssertTrue(snapshot.detailSections.contains(where: { $0.id == "openai-credits" }))
     }
 
+    func testOpenAIFetchesAvailableResetCreditsFromAuxiliaryPayload() throws {
+        let snapshot = try OpenAIUsageNormalizer.snapshot(
+            from: fixture("openai-weekly-only"),
+            credentials: fixtureCredentials,
+            resetCreditsData: fixture("openai-reset-credits")
+        ).curatedForDashboard()
+
+        let resets = try XCTUnwrap(snapshot.detailSections.first(where: {
+            $0.id == "openai-usage-limit-resets"
+        }))
+        XCTAssertEqual(resets.items.count, 2)
+        XCTAssertEqual(resets.items.map(\.title), ["Full reset", "Full reset"])
+        XCTAssertTrue(resets.items[0].value.contains("Sep 20, 2026"))
+        XCTAssertTrue(resets.items[1].value.contains("Sep 21, 2026"))
+        XCTAssertFalse(resets.items.contains(where: { $0.title.contains("No usage limit resets") }))
+    }
+
     func testOpenAIPlanNamesMatchCodexProductLanguage() {
         XCTAssertEqual(OpenAIUsageNormalizer.planDisplayName("prolite"), "Pro 5x")
         XCTAssertEqual(OpenAIUsageNormalizer.planDisplayName("pro"), "Pro 20x")

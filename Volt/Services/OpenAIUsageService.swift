@@ -422,6 +422,7 @@ enum OpenAIUsageNormalizer {
     static func snapshot(
         from data: Data,
         credentials: OpenAICredentials,
+        resetCreditsData: Data? = nil,
         now: Date = Date()
     ) throws -> ProviderUsageSnapshot {
         let payload: OpenAIUsagePayload
@@ -560,7 +561,9 @@ enum OpenAIUsageNormalizer {
             detailSections.append(UsageDetailSection(id: "openai-credits", title: "Credits", items: items))
         }
 
-        let resetCreditItems = parseResetCredits(payload.rateLimitResetCredits)
+        let resetCreditsValue = resetCreditsData.flatMap { try? JSONDecoder().decode(JSONValue.self, from: $0) }
+            ?? payload.rateLimitResetCredits
+        let resetCreditItems = parseResetCredits(resetCreditsValue)
         if !resetCreditItems.isEmpty {
             detailSections.append(UsageDetailSection(
                 id: "openai-reset-credits",
@@ -822,13 +825,19 @@ enum OpenAIUsageNormalizer {
     private static func resetCreditItem(_ value: JSONValue, index: Int) -> UsageDetailItem? {
         switch value {
         case let .object(object):
+            if let status = firstString(object, keys: ["status"]),
+               status.caseInsensitiveCompare("available") != .orderedSame {
+                return nil
+            }
             let amount = firstNumber(object, keys: [
                 "credits", "amount", "value", "count", "balance",
                 "remaining", "granted", "granted_credits", "reset_credits",
             ])
-            let label = firstString(object, keys: ["label", "name", "description", "type", "title"])
+            let explicitLabel = firstString(object, keys: ["label", "name", "description", "title"])
+            let resetType = firstString(object, keys: ["reset_type", "resetType", "type"])
+            let label = explicitLabel ?? resetType.map(resetCreditName)
             let expiry = firstDate(object, keys: [
-                "expires_at", "expiry", "exp", "expires", "expiration",
+                "expires_at", "expiresAt", "expiry", "exp", "expires", "expiration",
                 "expire_at", "valid_until", "reset_at", "resets_at",
             ])
             guard amount != nil || label != nil || expiry != nil else { return nil }
@@ -904,6 +913,15 @@ enum OpenAIUsageNormalizer {
         return amount == 1 ? "\(number) credit" : "\(number) credits"
     }
 
+    nonisolated private static func resetCreditName(_ raw: String) -> String {
+        switch raw.lowercased() {
+        case "codex_rate_limits", "full", "full_reset":
+            return "Full reset"
+        default:
+            return readableName(raw)
+        }
+    }
+
     private static func formatExpiry(_ date: Date) -> String {
         date.formatted(.dateTime.month(.abbreviated).day().year())
     }
@@ -940,6 +958,7 @@ enum OpenAIUsageNormalizer {
 
 enum OpenAIUsageService {
     private static let usageURL = URL(string: "https://chatgpt.com/backend-api/wham/usage")!
+    private static let resetCreditsURL = URL(string: "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits")!
     private static let refreshURL = URL(string: "https://auth.openai.com/oauth/token")!
     private static let clientID = "app_EMoamEEZ73f0CkXaXp7hrann"
 
@@ -981,7 +1000,15 @@ enum OpenAIUsageService {
             throw error.usageServiceError
         }
 
-        let snapshot = try OpenAIUsageNormalizer.snapshot(from: data, credentials: credentials)
+        // Reset-credit details and expirations live on a separate endpoint from
+        // the quota windows. Keep this auxiliary request best-effort so a backend
+        // rollout or temporary failure does not hide the primary usage data.
+        let resetCreditsData = try? await requestResetCredits(credentials: credentials)
+        let snapshot = try OpenAIUsageNormalizer.snapshot(
+            from: data,
+            credentials: credentials,
+            resetCreditsData: resetCreditsData
+        )
         return Result(snapshot: snapshot, credentials: credentials)
     }
 
@@ -1012,6 +1039,32 @@ enum OpenAIUsageService {
         default:
             throw OpenAIRequestError.status(response.statusCode)
         }
+    }
+
+    private static func requestResetCredits(credentials: OpenAICredentials) async throws -> Data {
+        var request = URLRequest(
+            url: resetCreditsURL,
+            cachePolicy: .reloadIgnoringLocalCacheData,
+            timeoutInterval: 30
+        )
+        request.setValue("Bearer \(credentials.accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("Volt/1.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("codex-1", forHTTPHeaderField: "OpenAI-Beta")
+        request.setValue("Codex Desktop", forHTTPHeaderField: "originator")
+        request.setValue("CODEX", forHTTPHeaderField: "OAI-Product-Sku")
+        if !credentials.accountID.isEmpty {
+            request.setValue(credentials.accountID, forHTTPHeaderField: "ChatGPT-Account-Id")
+        }
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let response = response as? HTTPURLResponse else {
+            throw OpenAIRequestError.invalidResponse
+        }
+        guard (200..<300).contains(response.statusCode) else {
+            throw OpenAIRequestError.status(response.statusCode)
+        }
+        return data
     }
 
     private static func refresh(_ credentials: OpenAICredentials) async throws -> OpenAICredentials {

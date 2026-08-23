@@ -86,8 +86,8 @@ final class UsageNormalizerTests: XCTestCase {
         }))
         XCTAssertEqual(resets.items.count, 2)
         XCTAssertEqual(resets.items.map(\.title), ["Full reset", "Full reset"])
-        XCTAssertTrue(resets.items[0].value.contains("Sep 20, 2026"))
-        XCTAssertTrue(resets.items[1].value.contains("Sep 21, 2026"))
+        XCTAssertEqual(resets.items[0].value, "Expires 9/20")
+        XCTAssertEqual(resets.items[1].value, "Expires 9/21")
         XCTAssertFalse(resets.items.contains(where: { $0.title.contains("No usage limit resets") }))
     }
 

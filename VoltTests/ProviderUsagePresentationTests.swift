@@ -101,8 +101,8 @@ final class ProviderUsagePresentationTests: XCTestCase {
                 id: "openai-reset-credits",
                 title: "Usage limit resets",
                 items: [
-                    UsageDetailItem(id: "openai-reset-credit-0", title: "5 credits", value: "Expires Jul 31, 2026"),
-                    UsageDetailItem(id: "openai-reset-credit-1", title: "10 credits", value: "Expires Aug 7, 2026"),
+                    UsageDetailItem(id: "openai-reset-credit-0", title: "Full reset", value: "Expires 7/31"),
+                    UsageDetailItem(id: "openai-reset-credit-1", title: "Full reset", value: "Expires 8/7"),
                 ]
             )],
             notices: [],
@@ -112,8 +112,8 @@ final class ProviderUsagePresentationTests: XCTestCase {
         let dashboard = raw.curatedForDashboard()
 
         let resets = try XCTUnwrap(dashboard.detailSections.first(where: { $0.title == "Usage limit resets" }))
-        XCTAssertEqual(resets.items.map(\.title), ["5 credits", "10 credits"])
-        XCTAssertEqual(resets.items.map(\.value), ["Expires Jul 31, 2026", "Expires Aug 7, 2026"])
+        XCTAssertEqual(resets.items.map(\.title), ["Full reset", "Full reset"])
+        XCTAssertEqual(resets.items.map(\.value), ["Expires 7/31", "Expires 8/7"])
         XCTAssertFalse(resets.items.contains(where: { $0.title == "No usage limit resets available at this time." }))
     }
 

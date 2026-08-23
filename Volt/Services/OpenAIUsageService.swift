@@ -923,7 +923,10 @@ enum OpenAIUsageNormalizer {
     }
 
     private static func formatExpiry(_ date: Date) -> String {
-        date.formatted(.dateTime.month(.abbreviated).day().year())
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "M/d"
+        return formatter.string(from: date)
     }
 
     private static func slug(_ value: String) -> String {

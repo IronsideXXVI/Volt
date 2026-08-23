@@ -353,41 +353,87 @@ struct ContentView: View {
         }
     }
 
+    @ViewBuilder
     private func detailSection(_ section: UsageDetailSection) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(section.title)
-                    .voltSectionHeader()
-                if let subtitle = section.subtitle {
-                    Text(styledMarkdown(subtitle))
-                        .voltCaption()
-                        .fixedSize(horizontal: false, vertical: true)
+        if section.id == "openai-usage-limit-resets" {
+            resetCreditsSection(section)
+        } else {
+            VStack(alignment: .leading, spacing: 9) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(section.title)
+                        .voltSectionHeader()
+                    if let subtitle = section.subtitle {
+                        Text(styledMarkdown(subtitle))
+                            .voltCaption()
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                ForEach(section.items) { item in
+                    if item.value.isEmpty {
+                        Text(item.title)
+                            .voltCaption()
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        HStack(alignment: .firstTextBaseline, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(item.title)
+                                    .voltCaption()
+                                if let detail = item.detail {
+                                    Text(detail)
+                                        .voltCaption()
+                                }
+                            }
+                            Spacer(minLength: 8)
+                            Text(item.value)
+                                .voltDetailValue()
+                                .multilineTextAlignment(.trailing)
+                                .lineLimit(2)
+                                .textSelection(.enabled)
+                        }
+                    }
                 }
             }
+        }
+    }
 
-            ForEach(section.items) { item in
-                if item.value.isEmpty {
+    private func resetCreditsSection(_ section: UsageDetailSection) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(section.title)
+                .voltSectionHeader()
+
+            Divider()
+                .padding(.top, 9)
+                .padding(.bottom, 10)
+
+            ForEach(Array(section.items.enumerated()), id: \.element.id) { index, item in
+                if index > 0 {
+                    Divider()
+                        .padding(.vertical, 10)
+                }
+
+                if item.id.hasPrefix("openai-reset-credit-") {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.title)
+                                .voltRowText()
+                            Text(item.value)
+                                .voltCaption()
+                        }
+
+                        Spacer(minLength: 8)
+
+                        Image(systemName: "chevron.right")
+                            .imageScale(.small)
+                            .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
+                    }
+                } else {
                     Text(item.title)
                         .voltCaption()
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(item.title)
-                                .voltCaption()
-                            if let detail = item.detail {
-                                Text(detail)
-                                    .voltCaption()
-                            }
-                        }
-                        Spacer(minLength: 8)
-                        Text(item.value)
-                            .voltDetailValue()
-                            .multilineTextAlignment(.trailing)
-                            .lineLimit(2)
-                            .textSelection(.enabled)
-                    }
                 }
             }
         }

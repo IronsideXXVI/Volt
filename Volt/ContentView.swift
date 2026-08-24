@@ -20,9 +20,11 @@ struct ContentView: View {
         VStack(spacing: 0) {
             header
 
-            accountSwitcher(selection: $store.selectedAccountID)
-                .padding(.horizontal, 14)
-                .padding(.bottom, 12)
+            if !store.dashboardAccounts.isEmpty {
+                accountSwitcher(selection: $store.selectedAccountID)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 12)
+            }
 
             Divider()
 
@@ -90,13 +92,13 @@ struct ContentView: View {
     // MARK: Account switcher
 
     private func accountSwitcher(selection: Binding<UUID>) -> some View {
-        let visibleTabCount = CGFloat(min(max(store.accounts.count, 1), 3))
+        let visibleTabCount = CGFloat(min(max(store.dashboardAccounts.count, 1), 3))
         let tabWidth = (326 - (visibleTabCount - 1) * 3) / visibleTabCount
 
         return ScrollViewReader { proxy in
             ScrollView(.horizontal) {
                 HStack(spacing: 3) {
-                    ForEach(store.accounts) { account in
+                    ForEach(store.dashboardAccounts) { account in
                         let isSelected = selection.wrappedValue == account.id
                         let accountLabel = store.accountLabel(for: account.id)
 
@@ -168,7 +170,7 @@ struct ContentView: View {
                 guard accountSwitcherIsVisible else { return }
                 revealAccount(accountID, in: proxy, animated: true)
             }
-            .onChange(of: store.accounts.map(\.id)) { _, _ in
+            .onChange(of: store.dashboardAccounts.map(\.id)) { _, _ in
                 guard accountSwitcherIsVisible else { return }
                 revealAccount(selection.wrappedValue, in: proxy, animated: true)
             }
@@ -177,7 +179,7 @@ struct ContentView: View {
 
     private func drawerTabLabel(for account: ProviderAccount) -> String {
         guard store.showsAccountNumbers,
-              let ordinal = store.accountOrdinal(for: account)
+              let ordinal = store.dashboardAccountOrdinal(for: account)
         else {
             return account.provider.displayName
         }
@@ -188,7 +190,7 @@ struct ContentView: View {
         guard accountSwitcherIsVisible,
               !didRevealInitialAccount,
               accountStripWidth > 0,
-              store.accounts.contains(where: { $0.id == accountID })
+              store.dashboardAccounts.contains(where: { $0.id == accountID })
         else { return }
 
         didRevealInitialAccount = true
@@ -196,7 +198,7 @@ struct ContentView: View {
     }
 
     private func revealAccount(_ accountID: UUID, in proxy: ScrollViewProxy, animated: Bool) {
-        guard store.accounts.contains(where: { $0.id == accountID }) else { return }
+        guard store.dashboardAccounts.contains(where: { $0.id == accountID }) else { return }
 
         if animated && !reduceMotion {
             withAnimation(.easeOut(duration: 0.16)) {

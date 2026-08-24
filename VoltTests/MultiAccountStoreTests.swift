@@ -3,6 +3,61 @@ import XCTest
 
 @MainActor
 final class MultiAccountStoreTests: XCTestCase {
+    func testDashboardAccountsExcludeEveryUnconfiguredPlaceholder() {
+        withIsolatedDefaults { defaults in
+            let store = UsageStore(
+                defaults: defaults,
+                migrateCredentials: false,
+                configuredAccountIDs: []
+            )
+
+            XCTAssertEqual(store.accounts.map(\.provider), [.anthropic, .openAI])
+            XCTAssertTrue(store.dashboardAccounts.isEmpty)
+        }
+    }
+
+    func testDashboardAccountsOnlyIncludeConfiguredProfilesAndSelectionFollowsThem() throws {
+        try withIsolatedDefaults { defaults in
+            let claude = ProviderAccount(id: UUID(), provider: .anthropic)
+            let openAI = ProviderAccount(id: UUID(), provider: .openAI)
+            defaults.set(try JSONEncoder().encode([claude, openAI]), forKey: "providerAccounts")
+            defaults.set(claude.id.uuidString, forKey: "selectedAccountID")
+
+            let store = UsageStore(
+                defaults: defaults,
+                migrateCredentials: false,
+                configuredAccountIDs: [openAI.id]
+            )
+
+            XCTAssertEqual(store.dashboardAccounts, [openAI])
+            XCTAssertEqual(store.selectedAccountID, openAI.id)
+            XCTAssertEqual(store.dashboardAccountOrdinal(for: openAI), 1)
+            XCTAssertNil(store.dashboardAccountOrdinal(for: claude))
+        }
+    }
+
+    func testDashboardAccountsPreserveConfiguredGlobalOrderWithCompactOrdinals() throws {
+        try withIsolatedDefaults { defaults in
+            let firstClaude = ProviderAccount(id: UUID(), provider: .anthropic)
+            let hiddenOpenAI = ProviderAccount(id: UUID(), provider: .openAI)
+            let secondClaude = ProviderAccount(id: UUID(), provider: .anthropic)
+            defaults.set(
+                try JSONEncoder().encode([firstClaude, hiddenOpenAI, secondClaude]),
+                forKey: "providerAccounts"
+            )
+
+            let store = UsageStore(
+                defaults: defaults,
+                migrateCredentials: false,
+                configuredAccountIDs: [firstClaude.id, secondClaude.id]
+            )
+
+            XCTAssertEqual(store.dashboardAccounts, [firstClaude, secondClaude])
+            XCTAssertEqual(store.dashboardAccountOrdinal(for: firstClaude), 1)
+            XCTAssertEqual(store.dashboardAccountOrdinal(for: secondClaude), 2)
+        }
+    }
+
     func testAddedAccountsAppendSelectAndReceiveGlobalOrdinals() {
         withIsolatedDefaults { defaults in
             let store = UsageStore(defaults: defaults, migrateCredentials: false)

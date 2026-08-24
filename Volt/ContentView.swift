@@ -414,21 +414,28 @@ struct ContentView: View {
                 }
 
                 if item.id.hasPrefix("openai-reset-credit-") {
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.title)
-                                .voltRowText()
-                            Text(item.value)
-                                .voltCaption()
+                    Link(destination: URL(string: "https://chatgpt.com/#settings/Usage")!) {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.title)
+                                    .voltRowText()
+                                Text(item.value)
+                                    .voltCaption()
+                            }
+
+                            Spacer(minLength: 8)
+
+                            Image(systemName: "chevron.right")
+                                .imageScale(.small)
+                                .foregroundStyle(.secondary)
+                                .accessibilityHidden(true)
                         }
-
-                        Spacer(minLength: 8)
-
-                        Image(systemName: "chevron.right")
-                            .imageScale(.small)
-                            .foregroundStyle(.secondary)
-                            .accessibilityHidden(true)
+                        .contentShape(Rectangle())
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    .buttonStyle(.plain)
+                    .help("Open ChatGPT Usage")
+                    .accessibilityHint("Opens ChatGPT Usage in your browser")
                 } else {
                     Text(item.title)
                         .voltCaption()

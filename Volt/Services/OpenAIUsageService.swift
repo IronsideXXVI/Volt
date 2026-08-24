@@ -835,7 +835,10 @@ enum OpenAIUsageNormalizer {
             ])
             let explicitLabel = firstString(object, keys: ["label", "name", "description", "title"])
             let resetType = firstString(object, keys: ["reset_type", "resetType", "type"])
-            let label = explicitLabel ?? resetType.map(resetCreditName)
+            // OpenAI's API description is promotional grant copy, while its Usage
+            // page consistently names this credit "Full reset". Prefer that
+            // product label whenever the reset type identifies a Codex reset.
+            let label = resetType.map(resetCreditName) ?? explicitLabel
             let expiry = firstDate(object, keys: [
                 "expires_at", "expiresAt", "expiry", "exp", "expires", "expiration",
                 "expire_at", "valid_until", "reset_at", "resets_at",

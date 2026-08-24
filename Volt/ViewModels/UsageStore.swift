@@ -39,7 +39,11 @@ final class UsageStore {
     private(set) var loadingAccounts: Set<UUID> = []
     private(set) var configuredAccounts: Set<UUID> = []
 
-    init(defaults: UserDefaults = .standard, migrateCredentials: Bool = true) {
+    init(
+        defaults: UserDefaults = .standard,
+        migrateCredentials: Bool = true,
+        configuredAccountIDs: Set<UUID>? = nil
+    ) {
         self.defaults = defaults
         let initialShowsAccountNumbers = defaults.object(forKey: Self.showsAccountNumbersKey) == nil
             ? true
@@ -73,12 +77,22 @@ final class UsageStore {
             ?? savedAccounts[0].id
         defaults.set(selectedAccountID.uuidString, forKey: Self.selectedAccountKey)
 
-        if migrateCredentials {
+        if let configuredAccountIDs {
+            configuredAccounts = configuredAccountIDs.intersection(savedAccounts.map(\.id))
+        } else if migrateCredentials {
             try? CredentialStore.migrateLegacyCredentials(to: savedAccounts)
             for account in savedAccounts where credentialsAreComplete(for: account) {
                 configuredAccounts.insert(account.id)
             }
         }
+        reconcileSelectionToConfiguredAccount()
+    }
+
+    /// Accounts eligible for dashboard tabs, preserving the user's global order.
+    /// Unconfigured provider placeholders remain available in Settings but never
+    /// occupy space in the menu-bar drawer.
+    var dashboardAccounts: [ProviderAccount] {
+        accounts.filter { configuredAccounts.contains($0.id) }
     }
 
     var selectedAccount: ProviderAccount {
@@ -103,6 +117,10 @@ final class UsageStore {
 
     func accountOrdinal(for account: ProviderAccount) -> Int? {
         accountOrdinal(for: account.id)
+    }
+
+    func dashboardAccountOrdinal(for account: ProviderAccount) -> Int? {
+        dashboardAccounts.firstIndex(where: { $0.id == account.id }).map { $0 + 1 }
     }
 
     func accountLabel(for accountID: UUID) -> String {
@@ -164,6 +182,7 @@ final class UsageStore {
             selectedAccountID = accounts.first(where: { $0.provider == account.provider })?.id
                 ?? accounts[0].id
         }
+        reconcileSelectionToConfiguredAccount()
     }
 
     @discardableResult
@@ -262,6 +281,7 @@ final class UsageStore {
         }
         snapshots[accountID] = nil
         errors[accountID] = nil
+        reconcileSelectionToConfiguredAccount(preferredAccountID: accountID)
     }
 
     func saveOpenAI(_ credentials: OpenAICredentials, accountID: UUID) throws {
@@ -275,6 +295,7 @@ final class UsageStore {
         }
         snapshots[accountID] = nil
         errors[accountID] = nil
+        reconcileSelectionToConfiguredAccount(preferredAccountID: accountID)
     }
 
     func disconnect(_ accountID: UUID) throws {
@@ -283,6 +304,16 @@ final class UsageStore {
         configuredAccounts.remove(accountID)
         snapshots[accountID] = nil
         errors[accountID] = nil
+        reconcileSelectionToConfiguredAccount()
+    }
+
+    private func reconcileSelectionToConfiguredAccount(preferredAccountID: UUID? = nil) {
+        guard !configuredAccounts.contains(selectedAccountID) else { return }
+        if let preferredAccountID, configuredAccounts.contains(preferredAccountID) {
+            selectedAccountID = preferredAccountID
+        } else if let fallback = dashboardAccounts.first {
+            selectedAccountID = fallback.id
+        }
     }
 
     private func credentialsAreComplete(for account: ProviderAccount) -> Bool {

@@ -6,6 +6,15 @@
     <description>Volt release updates</description>
     <language>en</language>
     <item>
+      <title>Volt 0.1.30</title>
+      <pubDate>Mon, 24 Aug 2026 21:46:52 +0000</pubDate>
+      <sparkle:version>30</sparkle:version>
+      <sparkle:shortVersionString>0.1.30</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0.0</sparkle:minimumSystemVersion>
+      <sparkle:releaseNotesLink>https://ironsidexxvi.github.io/Volt/releases/0.1.30.html</sparkle:releaseNotesLink>
+      <enclosure url="https://github.com/IronsideXXVI/Volt/releases/download/v0.1.30/Volt-0.1.30.dmg" length="5182355" type="application/octet-stream" sparkle:edSignature="0IE1J3bq+NuHuUJ5KyjDaHprxKdwQU4o/aSLImr8TIB6G0gflupVkTGOC+MFRIVhClC3zg7L4T1sESuCE6qOCA==" />
+    </item>
+    <item>
       <title>Volt 0.1.29</title>
       <pubDate>Mon, 24 Aug 2026 16:19:50 +0000</pubDate>
       <sparkle:version>29</sparkle:version>
@@ -130,15 +139,6 @@
       <sparkle:minimumSystemVersion>14.0.0</sparkle:minimumSystemVersion>
       <sparkle:releaseNotesLink>https://ironsidexxvi.github.io/Volt/releases/0.1.16.html</sparkle:releaseNotesLink>
       <enclosure url="https://github.com/IronsideXXVI/Volt/releases/download/v0.1.16/Volt-0.1.16.dmg" length="5026598" type="application/octet-stream" sparkle:edSignature="HnIiBD9dVTKADxIV/e/oLuyHYAl2YUYXlntX+FcvN1x4ReJqbjjSavqiInupEK2Z0uFsHqQb49Ys8FdQS0YXCA==" />
-    </item>
-    <item>
-      <title>Volt 0.1.15</title>
-      <pubDate>Mon, 20 Jul 2026 05:10:47 +0000</pubDate>
-      <sparkle:version>15</sparkle:version>
-      <sparkle:shortVersionString>0.1.15</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>14.0.0</sparkle:minimumSystemVersion>
-      <sparkle:releaseNotesLink>https://ironsidexxvi.github.io/Volt/releases/0.1.15.html</sparkle:releaseNotesLink>
-      <enclosure url="https://github.com/IronsideXXVI/Volt/releases/download/v0.1.15/Volt-0.1.15.dmg" length="5025407" type="application/octet-stream" sparkle:edSignature="aDZjhVTbsU9zu46b/Lk/GcwcFWpRKWk/cpGT2Tcgq0LhCEUQNnwICXN0Vh/GpHpbwdA3ZvZ1DoEq1NBJm+ggCA==" />
     </item>
   </channel>
 </rss>
